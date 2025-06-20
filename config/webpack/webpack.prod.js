@@ -1,6 +1,7 @@
 // Update config/webpack/webpack.prod.js for better bundle optimization
 
 const path = require('path');
+const HtmlWebpackPlugin = require('html-webpack-plugin'); // ← ADDED THIS
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
@@ -167,6 +168,24 @@ module.exports = {
     ]
   },
   plugins: [
+    // ← ADDED HtmlWebpackPlugin FIRST
+    new HtmlWebpackPlugin({
+      template: './public/index.html',
+      filename: 'index.html',
+      inject: true,
+      minify: {
+        removeComments: true,
+        collapseWhitespace: true,
+        removeRedundantAttributes: true,
+        useShortDoctype: true,
+        removeEmptyAttributes: true,
+        removeStyleLinkTypeAttributes: true,
+        keepClosingSlash: true,
+        minifyJS: true,
+        minifyCSS: true,
+        minifyURLs: true,
+      }
+    }),
     new MiniCssExtractPlugin({
       filename: '[name].[contenthash:8].css',
       chunkFilename: '[name].[contenthash:8].css'

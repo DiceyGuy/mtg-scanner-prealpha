@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "webpack serve --mode development --config config/webpack/webpack.dev.js",
-    "build": "npx webpack --mode production --config config/webpack/webpack.prod.js",
+    "build": "npx webpack --mode production --config config/webpack/webpack.prod.js && cp -r public/* dist/",
     "test": "jest --config config/jest.config.js",
     "test:watch": "jest --watch --config config/jest.config.js",
     "test:coverage": "jest --coverage --config config/jest.config.js",

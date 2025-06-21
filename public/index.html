@@ -3,14 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#3b82f6">
-    <meta name="description" content="Enterprise Magic: The Gathering Card Scanner">
-    <title>MTG Scanner Enterprise</title>
+    
+    <!-- PWA Configuration -->
+    <meta name="theme-color" content="#4a90e2">
+    <meta name="application-name" content="MTG Scanner Pro">
+    <meta name="description" content="Professional MTG Card Recognition and Collection Management Tool with AI-powered edition detection">
+    
+    <!-- Title -->
+    <title>MTG Scanner Pro</title>
+    
+    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
-    <link rel="icon" href="/icons/favicon.ico">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.svg">
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.svg">
+    
+    <!-- iOS PWA Configuration -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MTG Scanner Pro">
+    
+    <!-- Android PWA Configuration -->
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:title" content="MTG Scanner Pro">
+    <meta property="og:description" content="Professional MTG Card Recognition with AI-powered edition detection">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="/icons/icon-512x512.svg">
 </head>
 <body>
     <div id="root"></div>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #1a1a2e; color: white; font-family: Arial, sans-serif;">
+            <div style="text-align: center;">
+                <h1>🃏 MTG Scanner Pro</h1>
+                <p>You need to enable JavaScript to run this app.</p>
+                <p>Please enable JavaScript in your browser and refresh the page.</p>
+            </div>
+        </div>
+    </noscript>
 </body>
 </html>

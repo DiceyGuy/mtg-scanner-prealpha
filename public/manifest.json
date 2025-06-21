@@ -1,25 +1,114 @@
 {
-  "name": "MTG Scanner Enterprise",
+  "name": "MTG Scanner Pro",
   "short_name": "MTG Scanner",
-  "description": "Enterprise-grade Magic: The Gathering card scanner with OCR and database integration",
+  "description": "Professional MTG Card Recognition and Collection Management Tool with AI-powered edition detection",
   "version": "1.0.0",
-  "manifest_version": 3,
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "background_color": "#1a1a2e",
+  "theme_color": "#4a90e2",
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en",
   "categories": [
     "games",
     "utilities",
-    "productivity"
+    "productivity",
+    "entertainment"
   ],
-  "permissions": [
-    "camera",
-    "storage"
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96", 
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png", 
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable" 
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192x192.png", 
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384", 
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ],
+  "shortcuts": [
+    {
+      "name": "Quick Scan",
+      "short_name": "Scan",
+      "description": "Start scanning MTG cards immediately",
+      "url": "/?mode=scan",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "My Collection", 
+      "short_name": "Collection",
+      "description": "View your saved MTG collection",
+      "url": "/?tab=collection",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png", 
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "MTG Knowledge",
+      "short_name": "Knowledge", 
+      "description": "MTG rules and card interactions",
+      "url": "/?tab=knowledge",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192", 
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
   "offline_enabled": true,
-  "cache_mode": "aggressive"
+  "cache_mode": "networkFirst"
 }

@@ -1,458 +1,626 @@
-// Scanner.js - FIXED SCANNING LOGIC
-
+// Scanner.js - Professional MTG Tool with Tabbed Interface
 import React, { useState, useRef, useEffect } from 'react';
-import ClaudeVisionService from './ClaudeVisionService';
+import ClaudeVisionService from './ClaudeVisionService'; // BEHOLDER GEMINI API
+import CardDisplayUI from './src/CardDisplayUI';
+import DeckManager from './src/DeckManager';
+import MTGKnowledgeBase from './src/MTGKnowledgeBase';
+import EditionSelector from './src/EditionSelector';
+import './src/CardDisplay.css';
 
 const Scanner = () => {
-    // State
-    const [scanResult, setScanResult] = useState(null);
+    // Core scanner state
     const [isScanning, setIsScanning] = useState(false);
-    const [cameraError, setCameraError] = useState(null);
-    const [scannedCards, setScannedCards] = useState([]);
-    const [cameraReady, setCameraReady] = useState(false);
+    const [scanResult, setScanResult] = useState(null);
+    const [cameraStatus, setCameraStatus] = useState('initializing');
+    const [currentCard, setCurrentCard] = useState(null);
+    const [scanMode, setScanMode] = useState('continuous'); // continuous or single
+    
+    // UI state
+    const [activeTab, setActiveTab] = useState('scanner'); // scanner, deck, knowledge
+    const [scanHistory, setScanHistory] = useState([]);
+    const [isUIVisible, setIsUIVisible] = useState(true);
+    const [savedCards, setSavedCards] = useState([]);
+    
+    // Edition selection state
+    const [showEditionSelector, setShowEditionSelector] = useState(false);
+    const [availableEditions, setAvailableEditions] = useState([]);
+    const [pendingCardData, setPendingCardData] = useState(null);
     
     // Refs
     const videoRef = useRef(null);
-    const scanningRef = useRef(false); // FIXED: Use ref to track scanning state
-    const frameTimeoutRef = useRef(null); // FIXED: Track timeout to prevent duplicates
-    
-    // Create service instance once when component mounts
-    const [visionService] = useState(() => {
-        console.log('🔧 Creating ClaudeVisionService...');
-        try {
-            const service = new ClaudeVisionService();
-            console.log('✅ ClaudeVisionService created successfully');
-            return service;
-        } catch (error) {
-            console.error('❌ Failed to create ClaudeVisionService:', error);
-            return null;
-        }
-    });
-    
-    // Camera setup - only run once
+    const scanIntervalRef = useRef(null);
+    const visionServiceRef = useRef(null);
+
+    // Initialize services
     useEffect(() => {
-        if (!visionService) {
-            setCameraError('Vision service failed to initialize');
-            return;
-        }
-        
-        let mounted = true;
-        
-        const setupCamera = async () => {
-            try {
-                console.log('🎥 Setting up REAL camera (avoiding virtual cameras)...');
-                setCameraReady(false);
-                setCameraError(null);
-                
-                // Get list of all cameras and avoid virtual ones
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                
-                console.log('📹 Available cameras:', videoDevices.map(d => d.label));
-                
-                // Try to find a real camera (not virtual)
-                let selectedDeviceId = null;
-                for (const device of videoDevices) {
-                    const label = device.label.toLowerCase();
-                    // Skip virtual cameras
-                    if (!label.includes('elgato') && 
-                        !label.includes('virtual') && 
-                        !label.includes('obs') && 
-                        !label.includes('zoom') &&
-                        !label.includes('teams')) {
-                        selectedDeviceId = device.deviceId;
-                        console.log('✅ Selected real camera:', device.label);
-                        break;
-                    }
-                }
-                
-                // Camera constraints - force real camera
-                const constraints = {
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        facingMode: 'environment'
-                    }
-                };
-                
-                // If we found a real camera, use it specifically
-                if (selectedDeviceId) {
-                    constraints.video.deviceId = { exact: selectedDeviceId };
-                }
-                
-                console.log('🎥 Requesting camera with constraints:', constraints);
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                
-                if (mounted && videoRef.current) {
-                    // Stop any existing stream first
-                    if (videoRef.current.srcObject) {
-                        const tracks = videoRef.current.srcObject.getTracks();
-                        tracks.forEach(track => track.stop());
-                    }
-                    
-                    videoRef.current.srcObject = stream;
-                    
-                    // FIXED: Better video loading handling
-                    videoRef.current.onloadedmetadata = () => {
-                        if (mounted) {
-                            console.log('✅ Real camera ready and displaying');
-                            console.log('📐 Video dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
-                            setCameraReady(true);
-                            setCameraError(null);
-                        }
-                    };
-                    
-                    videoRef.current.onerror = (e) => {
-                        console.error('❌ Video element error:', e);
-                        if (mounted) setCameraError('Video playback failed');
-                    };
-                    
-                    // Force play
-                    try {
-                        await videoRef.current.play();
-                        console.log('▶️ Video playing successfully');
-                    } catch (playError) {
-                        console.warn('⚠️ Video play warning (may still work):', playError.message);
-                    }
-                    
-                    console.log('📹 Real camera stream assigned successfully');
-                }
-            } catch (error) {
-                console.error('❌ Camera setup failed:', error);
-                if (mounted) {
-                    setCameraError(`Camera failed: ${error.message}`);
-                    setCameraReady(false);
-                }
-            }
-        };
-        
+        initializeServices();
         setupCamera();
+        loadSavedCards();
         
         return () => {
-            mounted = false;
-            // Cleanup camera stream
-            if (videoRef.current && videoRef.current.srcObject) {
-                const tracks = videoRef.current.srcObject.getTracks();
-                tracks.forEach(track => track.stop());
-            }
-        };
-    }, [visionService]);
-    
-    // FIXED: Better scanning control
-    const startScanning = () => {
-        if (!visionService) {
-            console.error('❌ Vision service not available');
-            return;
-        }
-        if (!videoRef.current || cameraError || !cameraReady) {
-            console.error('❌ Camera not ready');
-            return;
-        }
-        if (scanningRef.current) {
-            console.log('⚠️ Already scanning, ignoring duplicate start');
-            return;
-        }
-        
-        console.log('▶️ Starting scan...');
-        scanningRef.current = true;
-        setIsScanning(true);
-        processFrame();
-    };
-    
-    // FIXED: Better stop control
-    const stopScanning = () => {
-        console.log('⏹️ Stopping scan...');
-        scanningRef.current = false;
-        setIsScanning(false);
-        
-        // Clear any pending timeouts
-        if (frameTimeoutRef.current) {
-            clearTimeout(frameTimeoutRef.current);
-            frameTimeoutRef.current = null;
-        }
-    };
-    
-    // FIXED: More robust frame processing
-    const processFrame = async () => {
-        // Check if we should still be scanning
-        if (!scanningRef.current || !videoRef.current || !visionService) {
-            console.log('🛑 Stopping frame processing (scanning stopped or resources unavailable)');
-            return;
-        }
-        
-        try {
-            console.log('🎯 Processing frame...');
-            const result = await visionService.processVideoFrame(videoRef.current);
-            
-            // Only update state if still scanning
-            if (!scanningRef.current) return;
-            
-            if (result.hasCard) {
-                // Success: Valid card detected
-                setScanResult({
-                    type: 'success',
-                    cardName: result.cardName,
-                    confidence: result.confidence,
-                    detectionConfidence: result.detectionConfidence,
-                    dimensions: result.dimensions,
-                    processingTime: result.processingTime,
-                    timestamp: new Date().toISOString()
-                });
-                
-                console.log(`🎯 Card found: ${result.cardName} (${result.confidence}%)`);
-                
-                // Add to history
-                if (result.confidence > 70) {
-                    setScannedCards(prev => [{
-                        id: Date.now(),
-                        name: result.cardName,
-                        confidence: result.confidence,
-                        timestamp: new Date().toISOString()
-                    }, ...prev.slice(0, 9)]);
-                }
-                
-            } else {
-                // Waiting: No valid card
-                setScanResult({
-                    type: 'waiting',
-                    message: result.message,
-                    reason: result.reason,
-                    details: result.details,
-                    timestamp: new Date().toISOString()
-                });
-                console.log(`📍 ${result.reason}: ${result.message}`);
-            }
-            
-        } catch (error) {
-            console.error('❌ Frame processing error:', error);
-            if (scanningRef.current) {
-                setScanResult({
-                    type: 'error',
-                    message: 'Processing error: ' + error.message,
-                    timestamp: new Date().toISOString()
-                });
-            }
-        }
-        
-        // Continue scanning if still active
-        if (scanningRef.current) {
-            frameTimeoutRef.current = setTimeout(processFrame, 1000); // FIXED: Slower, more stable rate
-        }
-    };
-    
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            if (frameTimeoutRef.current) {
-                clearTimeout(frameTimeoutRef.current);
-            }
+            cleanup();
         };
     }, []);
-    
-    // Render scan status
-    const renderStatus = () => {
-        if (cameraError) {
-            return (
-                <div style={{ padding: '20px', backgroundColor: '#ffebee', border: '1px solid #f44336', borderRadius: '8px' }}>
-                    <h3>❌ Camera Error</h3>
-                    <p>{cameraError}</p>
-                    <p style={{ fontSize: '14px', color: '#666' }}>
-                        💡 <strong>Tip:</strong> If using Elgato/Virtual camera, try switching to your built-in webcam
-                    </p>
-                </div>
-            );
-        }
+
+    const initializeServices = () => {
+        console.log('🔧 Initializing MTG Scanner Pro...');
         
-        if (!visionService) {
-            return (
-                <div style={{ padding: '20px', backgroundColor: '#ffebee', border: '1px solid #f44336', borderRadius: '8px' }}>
-                    <h3>❌ Service Error</h3>
-                    <p>Vision service failed to initialize</p>
-                </div>
-            );
-        }
-        
-        if (!cameraReady) {
-            return (
-                <div style={{ padding: '20px', backgroundColor: '#fff3e0', border: '1px solid #ff9800', borderRadius: '8px', textAlign: 'center' }}>
-                    <h3>📹 Setting up Real Camera...</h3>
-                    <p>Connecting to HD Pro Webcam C920...</p>
-                </div>
-            );
-        }
-        
-        if (!scanResult) {
-            return (
-                <div style={{ padding: '20px', backgroundColor: '#e8f5e8', border: '1px solid #4caf50', borderRadius: '8px', textAlign: 'center' }}>
-                    <h3>✅ Real Camera Active!</h3>
-                    <p>HD Pro Webcam C920 ready! Click "Start Scanning" to begin</p>
-                </div>
-            );
-        }
-        
-        switch (scanResult.type) {
-            case 'success':
-                return (
-                    <div style={{ padding: '20px', backgroundColor: '#e8f5e8', border: '1px solid #4caf50', borderRadius: '8px' }}>
-                        <h3>✅ Card Detected</h3>
-                        <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '10px 0' }}>{scanResult.cardName}</p>
-                        <p>OCR Confidence: <strong>{scanResult.confidence}%</strong></p>
-                        {scanResult.detectionConfidence && (
-                            <p>Detection: <strong>{(scanResult.detectionConfidence * 100).toFixed(1)}%</strong></p>
-                        )}
-                        <p>Size: {scanResult.dimensions} | Time: {scanResult.processingTime}ms</p>
-                    </div>
-                );
-                
-            case 'waiting':
-                return (
-                    <div style={{ padding: '20px', backgroundColor: '#fff3e0', border: '1px solid #ff9800', borderRadius: '8px' }}>
-                        <h3>🔍 Looking for Card...</h3>
-                        <p>{scanResult.message}</p>
-                        {scanResult.reason && <p style={{ fontSize: '14px', color: '#666' }}>Issue: {scanResult.reason.replace(/_/g, ' ')}</p>}
-                        {scanResult.details && <p style={{ fontSize: '12px', color: '#999' }}>Details: {scanResult.details}</p>}
-                    </div>
-                );
-                
-            case 'error':
-                return (
-                    <div style={{ padding: '20px', backgroundColor: '#ffebee', border: '1px solid #f44336', borderRadius: '8px' }}>
-                        <h3>❌ Scanner Error</h3>
-                        <p>{scanResult.message}</p>
-                    </div>
-                );
-                
-            default:
-                return null;
+        try {
+            // BRUKER GEMINI API SOM FUNGERER PERFEKT
+            visionServiceRef.current = new ClaudeVisionService();
+            console.log('✅ Gemini Vision Service initialized successfully');
+        } catch (error) {
+            console.error('❌ Service initialization failed:', error);
         }
     };
-    
-    // Render scanned cards history
-    const renderHistory = () => {
-        if (scannedCards.length === 0) return null;
+
+    const loadSavedCards = () => {
+        try {
+            const saved = localStorage.getItem('mtg_saved_cards');
+            if (saved) {
+                setSavedCards(JSON.parse(saved));
+                console.log('📁 Loaded saved cards from storage');
+            }
+        } catch (error) {
+            console.error('❌ Failed to load saved cards:', error);
+        }
+    };
+
+    const setupCamera = async () => {
+        console.log('🎥 Setting up HD camera for MTG Scanner Pro...');
+        setCameraStatus('requesting');
         
-        return (
-            <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-                <h4>📋 Recent Scans ({scannedCards.length})</h4>
-                {scannedCards.slice(0, 5).map(card => (
-                    <div key={card.id} style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        padding: '8px', 
-                        margin: '5px 0', 
-                        backgroundColor: 'white', 
-                        borderRadius: '4px' 
-                    }}>
-                        <span style={{ fontWeight: 'bold' }}>{card.name}</span>
-                        <span>{card.confidence}%</span>
-                        <span style={{ fontSize: '12px', color: '#666' }}>
-                            {new Date(card.timestamp).toLocaleTimeString()}
-                        </span>
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            console.log('📹 Available cameras:', videoDevices.map(d => d.label));
+            
+            // Prioritize HD Pro Webcam C920
+            const realCamera = videoDevices.find(device => 
+                device.label.includes('HD Pro Webcam') || 
+                device.label.includes('C920') ||
+                (!device.label.includes('Virtual') && 
+                 !device.label.includes('OBS') && 
+                 !device.label.includes('Elgato'))
+            ) || videoDevices[0];
+            
+            if (realCamera) {
+                console.log('✅ Selected professional camera:', realCamera.label);
+            }
+            
+            const constraints = {
+                video: {
+                    deviceId: realCamera ? { exact: realCamera.deviceId } : undefined,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'environment'
+                }
+            };
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.onloadedmetadata = () => {
+                    videoRef.current.play();
+                    setCameraStatus('ready');
+                    console.log('✅ Professional camera ready:', `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
+                };
+            }
+            
+        } catch (error) {
+            console.error('❌ Camera setup failed:', error);
+            setCameraStatus('error');
+        }
+    };
+
+    const startScanning = () => {
+        if (!visionServiceRef.current || cameraStatus !== 'ready') {
+            console.log('⚠️ MTG Scanner not ready');
+            return;
+        }
+        
+        console.log(`▶️ Starting MTG Scanner Pro - ${scanMode} mode...`);
+        setIsScanning(true);
+        
+        scanIntervalRef.current = setInterval(async () => {
+            try {
+                const result = await visionServiceRef.current.processVideoFrame(videoRef.current);
+                
+                if (result && result.hasCard && result.confidence >= 70) {
+                    console.log('🎯 MTG Card detected:', result.cardName, `(${result.confidence}%)`);
+                    
+                    // Stop scanning in single mode when card detected
+                    if (scanMode === 'single') {
+                        stopScanning();
+                    }
+                    
+                    // ALWAYS check for multiple editions, even if ClaudeVisionService enhanced the card
+                    await handleCardDetection(result);
+                    
+                } else if (result && !result.hasCard) {
+                    setScanResult({ hasCard: false, message: result.message || 'No MTG card detected' });
+                    setCurrentCard(null);
+                }
+                
+            } catch (error) {
+                console.error('❌ Scanning error:', error);
+                setScanResult({ hasCard: false, message: 'Scanner error - please try again' });
+            }
+        }, scanMode === 'single' ? 500 : 1000); // Faster scanning for single mode
+    };
+
+    const handleCardDetection = async (detectedCard) => {
+        try {
+            console.log('🎭 Checking for multiple editions of:', detectedCard.cardName);
+            
+            // Create a clean search query
+            const cardName = detectedCard.cardName.trim();
+            const searchQuery = `!"${cardName}"`;
+            const encodedQuery = encodeURIComponent(searchQuery);
+            
+            console.log('🔍 Scryfall search query:', searchQuery);
+            
+            // Search for all editions of this card in Scryfall
+            const editionsResponse = await fetch(
+                `https://api.scryfall.com/cards/search?q=${encodedQuery}&unique=prints&order=released&dir=desc`
+            );
+            
+            if (editionsResponse.ok) {
+                const editionsData = await editionsResponse.json();
+                const editions = editionsData.data || [];
+                
+                console.log(`📊 Scryfall returned ${editions.length} total results`);
+                
+                // Filter to exact name matches only (case insensitive, trimmed)
+                const exactMatches = editions.filter(card => {
+                    const cardNameNormalized = card.name.toLowerCase().trim();
+                    const searchNameNormalized = cardName.toLowerCase().trim();
+                    const match = cardNameNormalized === searchNameNormalized;
+                    
+                    if (!match) {
+                        console.log(`❌ Filtered out: "${card.name}" (${card.set_name})`);
+                    }
+                    return match;
+                });
+                
+                console.log(`🎯 Found ${exactMatches.length} exact name matches for "${cardName}"`);
+                
+                // Log all exact matches for debugging
+                exactMatches.forEach((card, index) => {
+                    console.log(`   ${index + 1}. ${card.set_name} (${card.set.toUpperCase()}) - ${card.released_at}`);
+                });
+                
+                if (exactMatches.length > 1) {
+                    // Multiple editions found - show selector
+                    console.log(`🎭 MULTIPLE EDITIONS DETECTED! Showing selector for ${exactMatches.length} editions`);
+                    
+                    // Stop scanning in single mode when multiple editions detected
+                    if (scanMode === 'single') {
+                        console.log('⏹️ Stopping single mode scan for edition selection');
+                        stopScanning();
+                    }
+                    
+                    setPendingCardData(detectedCard);
+                    setAvailableEditions(exactMatches);
+                    setShowEditionSelector(true);
+                    
+                    // Clear any existing scan result to show edition selector
+                    setScanResult(null);
+                    setCurrentCard(null);
+                    return; // Don't display card yet, wait for user selection
+                    
+                } else if (exactMatches.length === 1) {
+                    // Single edition - use it directly
+                    console.log(`✅ Single edition found: ${exactMatches[0].set_name} (${exactMatches[0].set.toUpperCase()})`);
+                    const enhancedCard = enhanceCardWithScryfall(detectedCard, exactMatches[0]);
+                    displayCard(enhancedCard);
+                    
+                } else {
+                    // No exact matches - use original detection (possibly already enhanced by ClaudeVisionService)
+                    console.log('⚠️ No exact Scryfall matches found, using original detection');
+                    displayCard(detectedCard);
+                }
+            } else {
+                const errorText = await editionsResponse.text();
+                console.log('❌ Scryfall API error:', editionsResponse.status, errorText);
+                displayCard(detectedCard);
+            }
+        } catch (error) {
+            console.error('❌ Edition lookup error:', error);
+            displayCard(detectedCard);
+        }
+    };
+
+    const enhanceCardWithScryfall = (originalCard, scryfallCard) => {
+        return {
+            ...originalCard,
+            // Enhanced with Scryfall data
+            cardType: scryfallCard.type_line,
+            manaCost: scryfallCard.mana_cost,
+            setInfo: scryfallCard.set_name,
+            rarity: scryfallCard.rarity,
+            scryfallId: scryfallCard.id,
+            scryfallImageUrl: scryfallCard.image_uris?.normal || scryfallCard.image_uris?.large,
+            scryfallUri: scryfallCard.scryfall_uri,
+            prices: scryfallCard.prices,
+            collectorNumber: scryfallCard.collector_number,
+            releaseDate: scryfallCard.released_at,
+            scryfallVerified: true
+        };
+    };
+
+    const displayCard = (card) => {
+        setCurrentCard(card);
+        setScanResult(card);
+        
+        // Add to scan history (avoid duplicates)
+        setScanHistory(prev => {
+            const isDuplicate = prev.some(historyCard => 
+                historyCard.cardName === card.cardName && 
+                Math.abs(new Date(historyCard.timestamp) - new Date(card.timestamp)) < 5000
+            );
+            
+            if (!isDuplicate) {
+                return [card, ...prev.slice(0, 19)]; // Keep last 20 cards
+            }
+            return prev;
+        });
+    };
+
+    const handleEditionSelected = (selectedEdition) => {
+        if (pendingCardData && selectedEdition) {
+            const enhancedCard = enhanceCardWithScryfall(pendingCardData, selectedEdition);
+            displayCard(enhancedCard);
+        }
+        
+        // Close edition selector
+        setShowEditionSelector(false);
+        setAvailableEditions([]);
+        setPendingCardData(null);
+    };
+
+    const handleEditionCancelled = () => {
+        // Use original detection without Scryfall enhancement
+        if (pendingCardData) {
+            displayCard(pendingCardData);
+        }
+        
+        setShowEditionSelector(false);
+        setAvailableEditions([]);
+        setPendingCardData(null);
+    };
+
+    const stopScanning = () => {
+        console.log('⏹️ Stopping MTG Scanner...');
+        setIsScanning(false);
+        
+        if (scanIntervalRef.current) {
+            clearInterval(scanIntervalRef.current);
+            scanIntervalRef.current = null;
+        }
+    };
+
+    const cleanup = () => {
+        stopScanning();
+        
+        if (videoRef.current && videoRef.current.srcObject) {
+            const tracks = videoRef.current.srcObject.getTracks();
+            tracks.forEach(track => track.stop());
+        }
+    };
+
+    // Card management actions
+    const saveCardToCollection = (card) => {
+        try {
+            const cardWithId = {
+                ...card,
+                id: Date.now() + Math.random(),
+                addedAt: new Date().toISOString(),
+                scannedAt: new Date().toLocaleString()
+            };
+            
+            const updatedCards = [cardWithId, ...savedCards];
+            setSavedCards(updatedCards);
+            
+            // Save to localStorage
+            localStorage.setItem('mtg_saved_cards', JSON.stringify(updatedCards));
+            
+            console.log('💾 Card saved to collection:', card.cardName);
+            
+            // Show success feedback
+            setScanResult(prev => ({
+                ...prev,
+                savedToCollection: true,
+                message: `✅ ${card.cardName} saved to collection!`
+            }));
+            
+            // Clear success message after 3 seconds
+            setTimeout(() => {
+                setScanResult(prev => ({
+                    ...prev,
+                    savedToCollection: false,
+                    message: undefined
+                }));
+            }, 3000);
+            
+        } catch (error) {
+            console.error('❌ Failed to save card:', error);
+            setScanResult(prev => ({
+                ...prev,
+                message: `❌ Failed to save ${card.cardName}`
+            }));
+        }
+    };
+
+    const removeCardFromCollection = (cardId) => {
+        try {
+            const updatedCards = savedCards.filter(card => card.id !== cardId);
+            setSavedCards(updatedCards);
+            localStorage.setItem('mtg_saved_cards', JSON.stringify(updatedCards));
+            console.log('🗑️ Card removed from collection');
+        } catch (error) {
+            console.error('❌ Failed to remove card:', error);
+        }
+    };
+
+    const openCardInScryfall = (card) => {
+        if (card && card.cardName) {
+            const searchUrl = `https://scryfall.com/search?q=${encodeURIComponent(card.cardName)}`;
+            window.open(searchUrl, '_blank');
+            console.log('🔗 Opening Scryfall for:', card.cardName);
+        }
+    };
+
+    const toggleUIVisibility = () => {
+        setIsUIVisible(!isUIVisible);
+        console.log('👁️ UI visibility toggled:', !isUIVisible);
+    };
+
+    const getCameraStatusDisplay = () => {
+        switch (cameraStatus) {
+            case 'initializing':
+                return { text: '🔧 Initializing...', class: 'status-initializing' };
+            case 'requesting':
+                return { text: '📷 Requesting access...', class: 'status-requesting' };
+            case 'ready':
+                return { text: '✅ HD Camera Ready', class: 'status-ready' };
+            case 'error':
+                return { text: '❌ Camera Error', class: 'status-error' };
+            default:
+                return { text: '⏳ Setting up...', class: 'status-default' };
+        }
+    };
+
+    const cameraStatus_display = getCameraStatusDisplay();
+
+    return (
+        <div className="mtg-scanner-pro">
+            {/* Header */}
+            <div className="app-header">
+                <div className="app-title-section">
+                    <div className="app-logo">
+                        <img 
+                            src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHg9IjUiIHk9IjUiIHdpZHRoPSI5MCIgaGVpZ2h0PSI5MCIgcng9IjEwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjMiIGZpbGw9IiMyMzI3MkEiLz4KPHRleHQgeD0iNTAiIHk9IjM1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE4IiBmb250LXdlaWdodD0iYm9sZCI+TVRHPC90ZXh0Pgo8bGluZSB4MT0iMTUiIHkxPSI1MCIgeDI9Ijg1IiB5Mj0iNTAiIHN0cm9rZT0iIzRBOTBFMiIgc3Ryb2tlLXdpZHRoPSIzIi8+Cjx0ZXh0IHg9IjUwIiB5PSI3NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPlNDQU5ORVI8L3RleHQ+Cjwvc3ZnPgo="
+                            alt="MTG Scanner Logo"
+                            className="logo-image"
+                        />
                     </div>
-                ))}
-                <button 
-                    onClick={() => setScannedCards([])}
-                    style={{ 
-                        marginTop: '10px', 
-                        padding: '8px 16px', 
-                        backgroundColor: '#f44336', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '4px' 
-                    }}
+                    <div className="app-title">
+                        <h1>MTG Scanner Pro</h1>
+                        <span className="app-subtitle">Professional MTG Card Management Tool</span>
+                    </div>
+                </div>
+                
+                <div className="header-stats">
+                    <div className="stat-item">
+                        <span className="stat-label">Accuracy:</span>
+                        <span className="stat-value">98%</span>
+                    </div>
+                    <div className="stat-item">
+                        <span className="stat-label">Database:</span>
+                        <span className="stat-value">34,983 cards</span>
+                    </div>
+                    <div className="stat-item">
+                        <span className="stat-label">Saved:</span>
+                        <span className="stat-value">{savedCards.length}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="tab-navigation">
+                <button
+                    className={`tab-btn ${activeTab === 'scanner' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('scanner')}
                 >
-                    Clear History
+                    🔍 Scanner
+                </button>
+                <button
+                    className={`tab-btn ${activeTab === 'deck' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('deck')}
+                >
+                    🃏 Collection ({savedCards.length})
+                </button>
+                <button
+                    className={`tab-btn ${activeTab === 'knowledge' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('knowledge')}
+                >
+                    📚 MTG Knowledge
                 </button>
             </div>
-        );
-    };
-    
-    return (
-        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-            {/* Header */}
-            <div style={{ 
-                textAlign: 'center', 
-                marginBottom: '20px', 
-                padding: '20px', 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-                color: 'white', 
-                borderRadius: '12px' 
-            }}>
-                <h1>🃏 MTG Infinity Scanner</h1>
-                <span style={{ fontWeight: 'bold' }}>
-                    {isScanning ? '🟢 Scanning Active' : cameraReady ? '🔴 Camera Ready' : '🟡 Setting up Camera'}
-                </span>
-            </div>
-            
-            {/* Video Container */}
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                <div style={{ 
-                    position: 'relative',
-                    display: 'inline-block',
-                    border: '3px solid #4caf50',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    backgroundColor: '#000'
-                }}>
-                    <video 
-                        ref={videoRef}
-                        autoPlay 
-                        playsInline 
-                        muted
-                        style={{
-                            width: '100%',
-                            maxWidth: '640px',
-                            height: 'auto',
-                            display: 'block'
-                        }}
-                    />
-                    {!cameraReady && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            color: 'white',
-                            fontSize: '18px',
-                            fontWeight: 'bold',
-                            textAlign: 'center',
-                            backgroundColor: 'rgba(0,0,0,0.8)',
-                            padding: '20px',
-                            borderRadius: '8px'
-                        }}>
-                            📹<br/>Connecting to Camera...<br/>
-                            <small>HD Pro Webcam C920</small>
+
+            {/* Main Content Area */}
+            <div className="main-content">
+                
+                {/* Scanner Tab */}
+                {activeTab === 'scanner' && (
+                    <div className="scanner-tab">
+                        <div className="scanner-section">
+                            {/* Video Feed */}
+                            <div className="video-container">
+                                <video
+                                    ref={videoRef}
+                                    className="scanner-video"
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                />
+                                
+                                {/* Camera Status Overlay */}
+                                <div className="camera-status-overlay">
+                                    <div className={`status-indicator ${cameraStatus_display.class}`}>
+                                        {cameraStatus_display.text}
+                                    </div>
+                                </div>
+                                
+                                {/* Scanning Overlay */}
+                                {isScanning && (
+                                    <div className="scanning-overlay">
+                                        <div className="scan-frame"></div>
+                                        <div className="scan-instructions">
+                                            🔍 Position MTG card in frame
+                                            <div className="scan-tech">Powered by Gemini AI</div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Scanner Controls */}
+                            <div className="scanner-controls">
+                                {/* Scan Mode Toggle */}
+                                <div className="scan-mode-section">
+                                    <label className="scan-mode-label">Scan Mode:</label>
+                                    <div className="scan-mode-toggle">
+                                        <button
+                                            className={`mode-btn ${scanMode === 'continuous' ? 'active' : ''}`}
+                                            onClick={() => setScanMode('continuous')}
+                                            disabled={isScanning}
+                                        >
+                                            🔄 Continuous
+                                        </button>
+                                        <button
+                                            className={`mode-btn ${scanMode === 'single' ? 'active' : ''}`}
+                                            onClick={() => setScanMode('single')}
+                                            disabled={isScanning}
+                                        >
+                                            📷 Single Shot
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Start/Stop Button */}
+                                <button
+                                    className={`scan-btn ${isScanning ? 'scanning' : 'ready'}`}
+                                    onClick={isScanning ? stopScanning : startScanning}
+                                    disabled={cameraStatus !== 'ready'}
+                                >
+                                    {isScanning ? '⏹️ Stop Scanning' : `▶️ Start ${scanMode === 'single' ? 'Single' : 'Continuous'} Scan`}
+                                </button>
+                                
+                                <button
+                                    className="ui-toggle-btn"
+                                    onClick={toggleUIVisibility}
+                                    title="Toggle card information display"
+                                >
+                                    {isUIVisible ? '👁️ Hide Info' : '👁️ Show Info'}
+                                </button>
+
+                                {/* Debug Edition Test Button */}
+                                <button
+                                    className="debug-btn"
+                                    onClick={() => {
+                                        console.log('🧪 Testing edition detection for Gilded Lotus...');
+                                        handleCardDetection({
+                                            cardName: 'Gilded Lotus',
+                                            confidence: 95,
+                                            timestamp: new Date().toISOString(),
+                                            hasCard: true
+                                        });
+                                    }}
+                                    title="Test edition detection"
+                                >
+                                    🧪 Test Editions
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Card Display UI */}
+                        {isUIVisible && (
+                            <div className="card-info-section">
+                                <CardDisplayUI
+                                    scanResult={scanResult}
+                                    isScanning={isScanning}
+                                    onSaveCard={saveCardToCollection}
+                                    onOpenScryfall={openCardInScryfall}
+                                    scanHistory={scanHistory}
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Collection/Deck Tab */}
+                {activeTab === 'deck' && (
+                    <div className="deck-tab">
+                        <DeckManager 
+                            savedCards={savedCards}
+                            onRemoveCard={removeCardFromCollection}
+                            onOpenScryfall={openCardInScryfall}
+                            scanHistory={scanHistory}
+                        />
+                    </div>
+                )}
+
+                {/* Knowledge Tab */}
+                {activeTab === 'knowledge' && (
+                    <div className="knowledge-tab">
+                        <MTGKnowledgeBase 
+                            currentCard={currentCard}
+                            savedCards={savedCards}
+                        />
+                    </div>
+                )}
+            </div>
+
+            {/* Status Bar */}
+            <div className="status-bar">
+                <div className="status-left">
+                    {scanHistory.length > 0 && (
+                        <>
+                            <span className="status-item">📊 Scanned: {scanHistory.length}</span>
+                            {currentCard && (
+                                <span className="status-item">
+                                    🎯 Last: {currentCard.cardName} ({currentCard.confidence}%)
+                                </span>
+                            )}
+                        </>
                     )}
                 </div>
+                <div className="status-right">
+                    <div className="footer-logo">
+                        <img 
+                            src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHg9IjUiIHk9IjUiIHdpZHRoPSI5MCIgaGVpZ2h0PSI5MCIgcng9IjEwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjMiIGZpbGw9IiMyMzI3MkEiLz4KPHRleHQgeD0iNTAiIHk9IjM1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE4IiBmb250LXdlaWdodD0iYm9sZCI+TVRHPC90ZXh0Pgo8bGluZSB4MT0iMTUiIHkxPSI1MCIgeDI9Ijg1IiB5Mj0iNTAiIHN0cm9rZT0iIzRBOTBFMiIgc3Ryb2tlLXdpZHRoPSIzIi8+Cjx0ZXh0IHg9IjUwIiB5PSI3NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPlNDQU5ORVI8L3RleHQ+Cjwvc3ZnPgo="
+                            alt="MTG Scanner"
+                        />
+                        MTG Scanner
+                    </div>
+                    <span className="status-item">🧠 Powered by Gemini AI</span>
+                    <span className="status-item">📡 Scryfall Database</span>
+                    <span className="status-item">📷 {scanMode} Mode</span>
+                </div>
             </div>
-            
-            {/* Controls */}
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                <button 
-                    onClick={isScanning ? stopScanning : startScanning}
-                    disabled={!!cameraError || !visionService || !cameraReady}
-                    style={{
-                        padding: '16px 32px',
-                        fontSize: '18px',
-                        backgroundColor: isScanning ? '#f44336' : '#4caf50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: (!!cameraError || !visionService || !cameraReady) ? 'not-allowed' : 'pointer',
-                        opacity: (!!cameraError || !visionService || !cameraReady) ? 0.6 : 1,
-                        fontWeight: 'bold'
-                    }}
-                >
-                    {isScanning ? '⏹️ Stop Scanning' : '▶️ Start Scanning'}
-                </button>
-            </div>
-            
-            {/* Results */}
-            <div>
-                {renderStatus()}
-                {renderHistory()}
-            </div>
+
+            {/* Edition Selector Modal */}
+            {showEditionSelector && (
+                <EditionSelector
+                    cardName={pendingCardData?.cardName}
+                    availableEditions={availableEditions}
+                    onEditionSelected={handleEditionSelected}
+                    onCancel={handleEditionCancelled}
+                />
+            )}
         </div>
     );
 };

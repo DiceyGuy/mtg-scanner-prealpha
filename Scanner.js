@@ -1,4 +1,4 @@
-// Scanner.js - Professional MTG Tool with Tabbed Interface
+// Scanner.js - Professional MTG Tool with Enhanced Camera Initialization
 import React, { useState, useRef, useEffect } from 'react';
 import ClaudeVisionService from './ClaudeVisionService'; // BEHOLDER GEMINI API
 import CardDisplayUI from './src/CardDisplayUI';
@@ -26,21 +26,45 @@ const Scanner = () => {
     const [availableEditions, setAvailableEditions] = useState([]);
     const [pendingCardData, setPendingCardData] = useState(null);
     
+    // Camera initialization state
+    const [cameraError, setCameraError] = useState(null);
+    const [cameraRetryCount, setCameraRetryCount] = useState(0);
+    const [permissionRequested, setPermissionRequested] = useState(false);
+    
     // Refs
     const videoRef = useRef(null);
     const scanIntervalRef = useRef(null);
     const visionServiceRef = useRef(null);
+    const cameraStreamRef = useRef(null);
 
-    // Initialize services
+    // Initialize services and camera automatically
     useEffect(() => {
         initializeServices();
-        setupCamera();
+        
+        // Auto-initialize camera when component mounts
+        const initCamera = async () => {
+            console.log('🚀 MTG Scanner: Auto-initializing camera...');
+            await setupCamera();
+        };
+        
+        // Start camera initialization after a brief delay
+        const cameraTimer = setTimeout(initCamera, 1000);
+        
         loadSavedCards();
         
         return () => {
+            clearTimeout(cameraTimer);
             cleanup();
         };
     }, []);
+
+    // Auto-initialize camera when scanner tab becomes active
+    useEffect(() => {
+        if (activeTab === 'scanner' && cameraStatus !== 'ready' && !permissionRequested) {
+            console.log('🎯 Scanner tab active, ensuring camera is ready...');
+            setupCamera();
+        }
+    }, [activeTab]);
 
     const initializeServices = () => {
         console.log('🔧 Initializing MTG Scanner Pro...');
@@ -66,17 +90,29 @@ const Scanner = () => {
         }
     };
 
+    // Enhanced camera setup with better error handling and auto-retry
     const setupCamera = async () => {
         console.log('🎥 Setting up HD camera for MTG Scanner Pro...');
         setCameraStatus('requesting');
+        setCameraError(null);
+        setPermissionRequested(true);
         
         try {
+            // Check if camera API is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Camera API not supported in this browser');
+            }
+
             const devices = await navigator.mediaDevices.enumerateDevices();
             const videoDevices = devices.filter(device => device.kind === 'videoinput');
             
-            console.log('📹 Available cameras:', videoDevices.map(d => d.label));
+            console.log('📹 Available cameras:', videoDevices.map(d => d.label || 'Camera'));
             
-            // Prioritize HD Pro Webcam C920
+            if (videoDevices.length === 0) {
+                throw new Error('No cameras found on this device');
+            }
+            
+            // Prioritize HD Pro Webcam C920 or real cameras
             const realCamera = videoDevices.find(device => 
                 device.label.includes('HD Pro Webcam') || 
                 device.label.includes('C920') ||
@@ -85,7 +121,7 @@ const Scanner = () => {
                  !device.label.includes('Elgato'))
             ) || videoDevices[0];
             
-            if (realCamera) {
+            if (realCamera && realCamera.label) {
                 console.log('✅ Selected professional camera:', realCamera.label);
             }
             
@@ -98,26 +134,150 @@ const Scanner = () => {
                 }
             };
             
+            // Request camera access
+            console.log('📷 Requesting camera permission...');
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            cameraStreamRef.current = stream;
             
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
                 videoRef.current.onloadedmetadata = () => {
                     videoRef.current.play();
                     setCameraStatus('ready');
+                    setCameraError(null);
+                    setCameraRetryCount(0);
                     console.log('✅ Professional camera ready:', `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
+                    
+                    // Show success message
+                    showCameraMessage('✅ Camera ready for scanning!', 'success');
                 };
             }
             
         } catch (error) {
             console.error('❌ Camera setup failed:', error);
             setCameraStatus('error');
+            handleCameraError(error);
         }
+    };
+
+    // Handle different camera errors with user-friendly messages and retry logic
+    const handleCameraError = (error) => {
+        let errorMessage = '';
+        let errorAction = '';
+        let canRetry = false;
+
+        switch (error.name) {
+            case 'NotAllowedError':
+                errorMessage = 'Camera permission denied';
+                errorAction = 'Please allow camera access and click "Try Again"';
+                canRetry = true;
+                break;
+            case 'NotFoundError':
+                errorMessage = 'No camera found';
+                errorAction = 'Please connect a camera or use a device with a camera';
+                canRetry = true;
+                break;
+            case 'NotReadableError':
+                errorMessage = 'Camera is busy';
+                errorAction = 'Please close other apps using the camera and try again';
+                canRetry = true;
+                break;
+            case 'OverconstrainedError':
+                errorMessage = 'Camera settings not supported';
+                errorAction = 'Trying with basic camera settings...';
+                canRetry = true;
+                // Try fallback settings
+                setTimeout(() => setupCameraFallback(), 1000);
+                break;
+            default:
+                errorMessage = error.message || 'Camera error';
+                errorAction = 'Please check your camera and try again';
+                canRetry = true;
+        }
+
+        setCameraError({ message: errorMessage, action: errorAction, canRetry });
+        
+        // Auto-retry logic for some errors
+        if (canRetry && cameraRetryCount < 3 && error.name !== 'NotAllowedError') {
+            const retryDelay = (cameraRetryCount + 1) * 2000; // 2s, 4s, 6s
+            console.log(`🔄 Auto-retrying camera setup in ${retryDelay/1000}s (attempt ${cameraRetryCount + 1}/3)`);
+            
+            setTimeout(() => {
+                setCameraRetryCount(prev => prev + 1);
+                setupCamera();
+            }, retryDelay);
+        }
+    };
+
+    // Fallback camera setup with basic constraints
+    const setupCameraFallback = async () => {
+        try {
+            console.log('🔄 Trying fallback camera settings...');
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: true // Basic video without constraints
+            });
+            
+            cameraStreamRef.current = stream;
+            
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.onloadedmetadata = () => {
+                    videoRef.current.play();
+                    setCameraStatus('ready');
+                    setCameraError(null);
+                    console.log('✅ Camera ready with fallback settings');
+                    showCameraMessage('✅ Camera ready (basic settings)', 'success');
+                };
+            }
+            
+        } catch (fallbackError) {
+            console.error('❌ Fallback camera settings also failed:', fallbackError);
+            handleCameraError(fallbackError);
+        }
+    };
+
+    // Manual camera retry
+    const retryCameraSetup = () => {
+        console.log('🔄 Manual camera retry requested');
+        setCameraRetryCount(0);
+        setCameraError(null);
+        setupCamera();
+    };
+
+    // Show temporary camera messages
+    const showCameraMessage = (message, type = 'info') => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'camera-toast-message';
+        messageDiv.innerHTML = message;
+        messageDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            z-index: 10000;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            max-width: 300px;
+        `;
+
+        document.body.appendChild(messageDiv);
+        
+        setTimeout(() => {
+            if (messageDiv.parentNode) {
+                messageDiv.parentNode.removeChild(messageDiv);
+            }
+        }, 3000);
     };
 
     const startScanning = () => {
         if (!visionServiceRef.current || cameraStatus !== 'ready') {
             console.log('⚠️ MTG Scanner not ready');
+            if (cameraStatus === 'error') {
+                showCameraMessage('❌ Camera not ready. Please fix camera issues first.', 'error');
+            }
             return;
         }
         
@@ -305,6 +465,12 @@ const Scanner = () => {
     const cleanup = () => {
         stopScanning();
         
+        // Stop camera stream
+        if (cameraStreamRef.current) {
+            cameraStreamRef.current.getTracks().forEach(track => track.stop());
+            cameraStreamRef.current = null;
+        }
+        
         if (videoRef.current && videoRef.current.srcObject) {
             const tracks = videoRef.current.srcObject.getTracks();
             tracks.forEach(track => track.stop());
@@ -475,6 +641,25 @@ const Scanner = () => {
                                     </div>
                                 </div>
                                 
+                                {/* Camera Error Overlay */}
+                                {cameraError && (
+                                    <div className="camera-error-overlay">
+                                        <div className="camera-error-card">
+                                            <h3>📹 Camera Issue</h3>
+                                            <p><strong>{cameraError.message}</strong></p>
+                                            <p>{cameraError.action}</p>
+                                            {cameraError.canRetry && (
+                                                <button 
+                                                    onClick={retryCameraSetup}
+                                                    className="retry-camera-btn"
+                                                >
+                                                    🔄 Try Again
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                
                                 {/* Scanning Overlay */}
                                 {isScanning && (
                                     <div className="scanning-overlay">
@@ -518,6 +703,17 @@ const Scanner = () => {
                                 >
                                     {isScanning ? '⏹️ Stop Scanning' : `▶️ Start ${scanMode === 'single' ? 'Single' : 'Continuous'} Scan`}
                                 </button>
+                                
+                                {/* Camera Retry Button */}
+                                {cameraStatus === 'error' && (
+                                    <button
+                                        className="retry-camera-btn"
+                                        onClick={retryCameraSetup}
+                                        title="Retry camera initialization"
+                                    >
+                                        🔄 Fix Camera
+                                    </button>
+                                )}
                                 
                                 <button
                                     className="ui-toggle-btn"

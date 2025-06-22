@@ -1,4 +1,4 @@
-// Scanner.js - Professional MTG Tool with Enhanced Camera Initialization
+// Scanner.js - Professional MTG Tool with Smart Scanning (Based on Working Version)
 import React, { useState, useRef, useEffect } from 'react';
 import ClaudeVisionService from './ClaudeVisionService'; // BEHOLDER GEMINI API
 import CardDisplayUI from './src/CardDisplayUI';
@@ -14,6 +14,11 @@ const Scanner = () => {
     const [cameraStatus, setCameraStatus] = useState('initializing');
     const [currentCard, setCurrentCard] = useState(null);
     const [scanMode, setScanMode] = useState('continuous'); // continuous or single
+    
+    // 🚀 NEW: Smart scanning state
+    const [continuousCount, setContinuousCount] = useState(0);
+    const [showContinueDialog, setShowContinueDialog] = useState(false);
+    const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
     
     // UI state
     const [activeTab, setActiveTab] = useState('scanner'); // scanner, deck, knowledge
@@ -284,6 +289,12 @@ const Scanner = () => {
         console.log(`▶️ Starting MTG Scanner Pro - ${scanMode} mode...`);
         setIsScanning(true);
         
+        // 🚀 NEW: Reset counter for continuous mode
+        if (scanMode === 'continuous') {
+            setContinuousCount(0);
+            console.log('🔄 Continuous mode: Reset counter to 0');
+        }
+        
         scanIntervalRef.current = setInterval(async () => {
             try {
                 const result = await visionServiceRef.current.processVideoFrame(videoRef.current);
@@ -311,6 +322,7 @@ const Scanner = () => {
         }, scanMode === 'single' ? 500 : 1000); // Faster scanning for single mode
     };
 
+    // 🧠 ENHANCED: Smart card detection with auto-save logic
     const handleCardDetection = async (detectedCard) => {
         try {
             console.log('🎭 Checking for multiple editions of:', detectedCard.cardName);
@@ -353,23 +365,43 @@ const Scanner = () => {
                 });
                 
                 if (exactMatches.length > 1) {
-                    // Multiple editions found - show selector
-                    console.log(`🎭 MULTIPLE EDITIONS DETECTED! Showing selector for ${exactMatches.length} editions`);
-                    
-                    // Stop scanning in single mode when multiple editions detected
+                    // 🎯 SMART BEHAVIOR: Different for single vs continuous mode
                     if (scanMode === 'single') {
-                        console.log('⏹️ Stopping single mode scan for edition selection');
+                        // SINGLE MODE: Stop and show edition selector for precise control
+                        console.log('⏹️ SINGLE MODE: Stopping for edition selection');
                         stopScanning();
+                        
+                        setPendingCardData(detectedCard);
+                        setAvailableEditions(exactMatches);
+                        setShowEditionSelector(true);
+                        
+                        setScanResult(null);
+                        setCurrentCard(null);
+                        return; // Wait for user selection
+                        
+                    } else if (scanMode === 'continuous') {
+                        // 🔄 CONTINUOUS MODE: Auto-pick best edition and continue
+                        console.log('🔄 CONTINUOUS MODE: Auto-selecting best edition');
+                        
+                        const bestEdition = selectBestEdition(exactMatches);
+                        console.log(`✅ Auto-selected: ${bestEdition.set_name} (${bestEdition.set.toUpperCase()})`);
+                        
+                        const enhancedCard = enhanceCardWithScryfall(detectedCard, bestEdition);
+                        displayCard(enhancedCard);
+                        
+                        // 💾 AUTO-SAVE to collection in continuous mode
+                        if (autoSaveEnabled) {
+                            saveCardToCollection(enhancedCard);
+                            console.log(`💾 AUTO-SAVED: ${enhancedCard.cardName} to collection`);
+                        }
+                        
+                        // Increment continuous scan counter and check limit
+                        handleContinuousCounterAndLimit();
+                        
+                        // Show brief toast about auto-selection
+                        showAutoSelectionToast(bestEdition.set_name);
+                        return;
                     }
-                    
-                    setPendingCardData(detectedCard);
-                    setAvailableEditions(exactMatches);
-                    setShowEditionSelector(true);
-                    
-                    // Clear any existing scan result to show edition selector
-                    setScanResult(null);
-                    setCurrentCard(null);
-                    return; // Don't display card yet, wait for user selection
                     
                 } else if (exactMatches.length === 1) {
                     // Single edition - use it directly
@@ -377,10 +409,24 @@ const Scanner = () => {
                     const enhancedCard = enhanceCardWithScryfall(detectedCard, exactMatches[0]);
                     displayCard(enhancedCard);
                     
+                    // Auto-save in continuous mode
+                    if (scanMode === 'continuous' && autoSaveEnabled) {
+                        saveCardToCollection(enhancedCard);
+                        console.log(`💾 AUTO-SAVED: ${enhancedCard.cardName} to collection`);
+                        handleContinuousCounterAndLimit();
+                    }
+                    
                 } else {
-                    // No exact matches - use original detection (possibly already enhanced by ClaudeVisionService)
+                    // No exact matches - use original detection
                     console.log('⚠️ No exact Scryfall matches found, using original detection');
                     displayCard(detectedCard);
+                    
+                    // Auto-save in continuous mode even without Scryfall data
+                    if (scanMode === 'continuous' && autoSaveEnabled) {
+                        saveCardToCollection(detectedCard);
+                        console.log(`💾 AUTO-SAVED: ${detectedCard.cardName} to collection (no Scryfall match)`);
+                        handleContinuousCounterAndLimit();
+                    }
                 }
             } else {
                 const errorText = await editionsResponse.text();
@@ -391,6 +437,91 @@ const Scanner = () => {
             console.error('❌ Edition lookup error:', error);
             displayCard(detectedCard);
         }
+    };
+
+    // 🚀 NEW: Smart edition selection for continuous mode
+    const selectBestEdition = (editions) => {
+        // Priority logic for auto-selecting best edition
+        
+        // 1. Prefer Standard-legal cards (recent sets)
+        const standardSets = ['mkm', 'otj', 'blb', 'dsk', 'fdn']; // Recent standard sets
+        const standardCard = editions.find(card => standardSets.includes(card.set));
+        if (standardCard) {
+            console.log('🎯 Auto-selected Standard-legal edition:', standardCard.set_name);
+            return standardCard;
+        }
+        
+        // 2. Prefer most recent printing (first in the ordered results)
+        const mostRecent = editions[0];
+        if (mostRecent) {
+            console.log('🆕 Auto-selected most recent edition:', mostRecent.set_name);
+            return mostRecent;
+        }
+        
+        // 3. Fallback to any available edition
+        return editions[0];
+    };
+
+    // 🚀 NEW: Handle continuous counter and 10-card limit
+    const handleContinuousCounterAndLimit = () => {
+        const newCount = continuousCount + 1;
+        setContinuousCount(newCount);
+        
+        if (newCount >= 10) {
+            console.log('🛑 CONTINUOUS MODE: 10-card limit reached, pausing...');
+            stopScanning();
+            setShowContinueDialog(true);
+        }
+    };
+
+    // 🚀 NEW: Show brief toast about auto-selection
+    const showAutoSelectionToast = (setName) => {
+        const toast = document.createElement('div');
+        toast.className = 'auto-selection-toast';
+        toast.innerHTML = `📦 Auto-selected: ${setName}`;
+        toast.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            z-index: 9999;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s ease-out;
+        `;
+
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }
+        }, 2000);
+    };
+
+    // 🚀 NEW: Handle 10-card limit dialog
+    const handleContinueScanning = () => {
+        console.log('🔄 User chose to continue scanning...');
+        setShowContinueDialog(false);
+        setContinuousCount(0); // Reset counter
+        startScanning(); // Resume scanning
+    };
+
+    const handleStopScanning = () => {
+        console.log('⏹️ User chose to stop scanning at 10-card limit');
+        setShowContinueDialog(false);
+        setContinuousCount(0); // Reset counter
+        // Already stopped, just close dialog
     };
 
     const enhanceCardWithScryfall = (originalCard, scryfallCard) => {
@@ -495,21 +626,23 @@ const Scanner = () => {
             
             console.log('💾 Card saved to collection:', card.cardName);
             
-            // Show success feedback
-            setScanResult(prev => ({
-                ...prev,
-                savedToCollection: true,
-                message: `✅ ${card.cardName} saved to collection!`
-            }));
-            
-            // Clear success message after 3 seconds
-            setTimeout(() => {
+            // Show success feedback only for manual saves (single mode)
+            if (scanMode === 'single') {
                 setScanResult(prev => ({
                     ...prev,
-                    savedToCollection: false,
-                    message: undefined
+                    savedToCollection: true,
+                    message: `✅ ${card.cardName} saved to collection!`
                 }));
-            }, 3000);
+                
+                // Clear success message after 3 seconds
+                setTimeout(() => {
+                    setScanResult(prev => ({
+                        ...prev,
+                        savedToCollection: false,
+                        message: undefined
+                    }));
+                }, 3000);
+            }
             
         } catch (error) {
             console.error('❌ Failed to save card:', error);
@@ -575,7 +708,7 @@ const Scanner = () => {
                     </div>
                     <div className="app-title">
                         <h1>MTG Scanner Pro</h1>
-                        <span className="app-subtitle">Professional MTG Card Management Tool</span>
+                        <span className="app-subtitle">Smart Bulk Scanning + Precise Control</span>
                     </div>
                 </div>
                 
@@ -666,7 +799,12 @@ const Scanner = () => {
                                         <div className="scan-frame"></div>
                                         <div className="scan-instructions">
                                             🔍 Position MTG card in frame
-                                            <div className="scan-tech">Powered by Gemini AI</div>
+                                            <div className="scan-tech">
+                                                {scanMode === 'continuous' ? 
+                                                    `🔄 Auto-saving to collection (${continuousCount}/10)` : 
+                                                    '📷 Single shot precision mode'
+                                                }
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -683,7 +821,7 @@ const Scanner = () => {
                                             onClick={() => setScanMode('continuous')}
                                             disabled={isScanning}
                                         >
-                                            🔄 Continuous
+                                            🔄 Continuous {scanMode === 'continuous' && `(${continuousCount}/10)`}
                                         </button>
                                         <button
                                             className={`mode-btn ${scanMode === 'single' ? 'active' : ''}`}
@@ -727,17 +865,17 @@ const Scanner = () => {
                                 <button
                                     className="debug-btn"
                                     onClick={() => {
-                                        console.log('🧪 Testing edition detection for Gilded Lotus...');
+                                        console.log('🧪 Testing smart scanning for Lightning Bolt...');
                                         handleCardDetection({
-                                            cardName: 'Gilded Lotus',
+                                            cardName: 'Lightning Bolt',
                                             confidence: 95,
                                             timestamp: new Date().toISOString(),
                                             hasCard: true
                                         });
                                     }}
-                                    title="Test edition detection"
+                                    title="Test smart scanning"
                                 >
-                                    🧪 Test Editions
+                                    🧪 Test Smart Scan
                                 </button>
                             </div>
                         </div>
@@ -816,6 +954,94 @@ const Scanner = () => {
                     onEditionSelected={handleEditionSelected}
                     onCancel={handleEditionCancelled}
                 />
+            )}
+
+            {/* Continue Scanning Dialog */}
+            {showContinueDialog && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(0,0,0,0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10000
+                }}>
+                    <div style={{
+                        background: '#23272a',
+                        border: '2px solid #4a90e2',
+                        borderRadius: '12px',
+                        padding: '24px',
+                        maxWidth: '450px',
+                        textAlign: 'center',
+                        color: 'white',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                    }}>
+                        <h3 style={{ margin: '0 0 16px 0', color: '#4a90e2', fontSize: '20px' }}>
+                            🎯 10 Cards Scanned!
+                        </h3>
+                        <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
+                            You've successfully scanned <strong>10 cards</strong> in continuous mode.
+                        </p>
+                        <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
+                            Auto-saved to your collection: <strong>{savedCards.length}</strong> total cards
+                        </p>
+                        
+                        <div style={{
+                            display: 'flex',
+                            gap: '12px',
+                            margin: '20px 0',
+                            justifyContent: 'center'
+                        }}>
+                            <button 
+                                onClick={handleContinueScanning}
+                                style={{
+                                    padding: '12px 20px',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    background: '#4a90e2',
+                                    color: 'white'
+                                }}
+                            >
+                                🔄 Continue Scanning
+                            </button>
+                            <button 
+                                onClick={handleStopScanning}
+                                style={{
+                                    padding: '12px 20px',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    background: '#666',
+                                    color: 'white'
+                                }}
+                            >
+                                ⏹️ Stop & Review Collection
+                            </button>
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-around',
+                            marginTop: '16px',
+                            paddingTop: '16px',
+                            borderTop: '1px solid #444',
+                            fontSize: '12px',
+                            color: '#ccc'
+                        }}>
+                            <span>📊 Session: {continuousCount} cards</span>
+                            <span>📁 Collection: {savedCards.length} total</span>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

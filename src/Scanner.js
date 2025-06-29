@@ -1,4 +1,4 @@
-// Scanner.js - MTG Scanner with Camera Persistence (FIXED) - COMPLETE VERSION
+// Scanner.js - MTG Scanner with Smart Cooldown System - COMPLETE INTEGRATED VERSION
 import React, { useState, useRef, useEffect } from 'react';
 import ClaudeVisionService from './ClaudeVisionService';
 import CardDisplayUI from './CardDisplayUI';
@@ -6,6 +6,141 @@ import DeckManager from './DeckManager';
 import MTGKnowledgeBase from './MTGKnowledgeBase';
 import EditionSelector from './EditionSelector';
 import './CardDisplay.css';
+
+// 🔥 Smart Cooldown System Class
+class MTGScannerCooldown {
+    constructor() {
+        this.lastDetectedCard = null;
+        this.lastDetectionTime = 0;
+        this.lastApiCall = 0;
+        this.consecutiveDetections = 0;
+        this.isEditionSelectorOpen = false;
+        
+        // Cooldown periods (in milliseconds)
+        this.SAME_CARD_COOLDOWN = 8000;      // 8 seconds for same card
+        this.MIN_API_INTERVAL = 2000;        // 2 seconds between API calls
+        this.FRAME_CHANGE_THRESHOLD = 0.1;   // 10% frame change required
+        this.MAX_CONSECUTIVE = 3;            // Max detections before longer cooldown
+        
+        this.lastFrameData = null;
+    }
+
+    // Check if we should scan this frame
+    shouldScan(cardName = null) {
+        const now = Date.now();
+        
+        // 1. Don't scan if edition selector is open
+        if (this.isEditionSelectorOpen) {
+            console.log("🚫 Scanning blocked: Edition selector open");
+            return false;
+        }
+        
+        // 2. Enforce minimum API interval
+        if (now - this.lastApiCall < this.MIN_API_INTERVAL) {
+            console.log(`🚫 Scanning blocked: API cooldown (${this.MIN_API_INTERVAL - (now - this.lastApiCall)}ms remaining)`);
+            return false;
+        }
+        
+        // 3. Same card cooldown
+        if (cardName && cardName === this.lastDetectedCard) {
+            const timeSinceLastDetection = now - this.lastDetectionTime;
+            if (timeSinceLastDetection < this.SAME_CARD_COOLDOWN) {
+                console.log(`🚫 Scanning blocked: Same card cooldown for "${cardName}" (${this.SAME_CARD_COOLDOWN - timeSinceLastDetection}ms remaining)`);
+                return false;
+            }
+        }
+        
+        // 4. Consecutive detection limit
+        if (this.consecutiveDetections >= this.MAX_CONSECUTIVE) {
+            console.log(`🚫 Scanning blocked: Max consecutive detections reached (${this.MAX_CONSECUTIVE})`);
+            return false;
+        }
+        
+        return true;
+    }
+
+    // Check if frame has changed significantly
+    hasFrameChanged(currentFrameData) {
+        if (!this.lastFrameData) {
+            this.lastFrameData = currentFrameData;
+            return true;
+        }
+        
+        // Simple frame change detection
+        const changeRatio = this.calculateFrameChange(this.lastFrameData, currentFrameData);
+        const hasChanged = changeRatio > this.FRAME_CHANGE_THRESHOLD;
+        
+        if (hasChanged) {
+            this.lastFrameData = currentFrameData;
+        }
+        
+        return hasChanged;
+    }
+
+    // Simple frame change calculation
+    calculateFrameChange(frame1, frame2) {
+        if (frame1.length !== frame2.length) return 1;
+        
+        let differences = 0;
+        const sampleSize = Math.min(1000, frame1.length); // Sample for performance
+        
+        for (let i = 0; i < sampleSize; i += 4) { // Sample every 4th byte
+            if (Math.abs(frame1[i] - frame2[i]) > 10) { // Threshold for significant change
+                differences++;
+            }
+        }
+        
+        return differences / (sampleSize / 4);
+    }
+
+    // Record a detection
+    recordDetection(cardName) {
+        const now = Date.now();
+        
+        if (cardName === this.lastDetectedCard) {
+            this.consecutiveDetections++;
+        } else {
+            this.consecutiveDetections = 1;
+            this.lastDetectedCard = cardName;
+        }
+        
+        this.lastDetectionTime = now;
+        this.lastApiCall = now;
+        
+        console.log(`✅ Detection recorded: "${cardName}" (consecutive: ${this.consecutiveDetections})`);
+    }
+
+    // Reset cooldowns (call when user interaction occurs)
+    resetCooldowns() {
+        console.log("🔄 Cooldowns reset by user interaction");
+        this.consecutiveDetections = 0;
+        this.lastDetectedCard = null;
+        this.lastDetectionTime = 0;
+    }
+
+    // Set edition selector state
+    setEditionSelectorOpen(isOpen) {
+        this.isEditionSelectorOpen = isOpen;
+        if (isOpen) {
+            console.log("🎭 Edition selector opened - scanning paused");
+        } else {
+            console.log("🎭 Edition selector closed - scanning can resume");
+            this.resetCooldowns(); // Reset when edition selector closes
+        }
+    }
+
+    // Get cooldown status for UI
+    getCooldownStatus() {
+        const now = Date.now();
+        return {
+            sameCardCooldown: this.lastDetectedCard ? Math.max(0, this.SAME_CARD_COOLDOWN - (now - this.lastDetectionTime)) : 0,
+            apiCooldown: Math.max(0, this.MIN_API_INTERVAL - (now - this.lastApiCall)),
+            consecutiveDetections: this.consecutiveDetections,
+            isEditionSelectorOpen: this.isEditionSelectorOpen,
+            canScan: this.shouldScan(this.lastDetectedCard)
+        };
+    }
+}
 
 const Scanner = () => {
     // Core scanner state
@@ -19,6 +154,9 @@ const Scanner = () => {
     const [continuousCount, setContinuousCount] = useState(0);
     const [showContinueDialog, setShowContinueDialog] = useState(false);
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+    
+    // 🔥 NEW: Cooldown system state
+    const [cooldownStatus, setCooldownStatus] = useState({});
     
     // UI state
     const [activeTab, setActiveTab] = useState('scanner');
@@ -41,7 +179,7 @@ const Scanner = () => {
     const [showPaywallModal, setShowPaywallModal] = useState(false);
     const FREE_COLLECTION_LIMIT = 100;
     
-    // 🔥 FIXED: Camera state with PERFECT persistence
+    // Camera state with persistence
     const [cameraError, setCameraError] = useState(null);
     const [cameraRetryCount, setCameraRetryCount] = useState(0);
     const [cameraInitializationComplete, setCameraInitializationComplete] = useState(false);
@@ -50,33 +188,40 @@ const Scanner = () => {
     const videoRef = useRef(null);
     const scanIntervalRef = useRef(null);
     const visionServiceRef = useRef(null);
-    const cameraStreamRef = useRef(null); // 🔥 PERSISTENT camera stream
-    const initializationPromiseRef = useRef(null); // 🔥 Prevent multiple initializations
+    const cameraStreamRef = useRef(null);
+    const initializationPromiseRef = useRef(null);
+    
+    // 🔥 NEW: Cooldown system ref
+    const cooldownSystemRef = useRef(new MTGScannerCooldown());
 
-    // 🔥 FIXED: Initialize services and camera ONCE, persist across tab switches
+    // 🔥 Initialize services and camera ONCE
     useEffect(() => {
         console.log('🔧 Component mounting - initializing services...');
         initializeServices();
         loadSavedData();
         
-        // 🔥 Initialize camera ONCE - this is the key fix!
+        // Initialize camera ONCE
         if (!initializationPromiseRef.current) {
             console.log('🚀 Starting PERSISTENT camera initialization...');
             initializationPromiseRef.current = setupCamera();
         }
         
-        // 🔥 FIXED: Only cleanup on component unmount, not tab switch
+        // Update cooldown status periodically
+        const cooldownUpdateInterval = setInterval(() => {
+            setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
+        }, 1000);
+        
         return () => {
             console.log('🧹 Component unmounting - cleaning up...');
+            clearInterval(cooldownUpdateInterval);
             cleanup();
         };
-    }, []); // 🔥 Empty dependency array - only run on mount/unmount
+    }, []);
 
-    // 🔥 FIXED: Handle tab switching without stopping camera
+    // Handle tab switching without stopping camera
     useEffect(() => {
         console.log(`🎯 Tab switched to: ${activeTab}`);
         
-        // 🔥 If switching to scanner tab, ensure video is connected but DON'T restart camera
         if (activeTab === 'scanner' && cameraStreamRef.current && cameraStreamRef.current.active) {
             console.log('🎯 Scanner tab active, ensuring video connection...');
             if (videoRef.current && !videoRef.current.srcObject) {
@@ -86,12 +231,11 @@ const Scanner = () => {
             }
         }
         
-        // 🔥 Stop scanning when leaving scanner tab, but keep camera active
         if (activeTab !== 'scanner' && isScanning) {
             console.log('⏸️ Pausing scanning - left scanner tab (camera stays active)');
             stopScanning();
         }
-    }, [activeTab]); // 🔥 Only depend on activeTab
+    }, [activeTab]);
 
     const initializeServices = () => {
         console.log('🔧 Initializing MTG Scanner Pro...');
@@ -106,21 +250,18 @@ const Scanner = () => {
 
     const loadSavedData = () => {
         try {
-            // Load saved cards
             const saved = localStorage.getItem('mtg_saved_cards');
             if (saved) {
                 setSavedCards(JSON.parse(saved));
                 console.log('📁 Loaded saved cards from storage');
             }
             
-            // Load edition preferences for AI learning
             const preferences = localStorage.getItem('mtg_edition_preferences');
             if (preferences) {
                 setEditionPreferences(JSON.parse(preferences));
                 console.log('🧠 Loaded edition preferences for AI learning');
             }
             
-            // Load premium status
             const premiumStatus = localStorage.getItem('mtg_premium_status');
             if (premiumStatus === 'true') {
                 setIsPremiumUser(true);
@@ -132,7 +273,7 @@ const Scanner = () => {
         }
     };
 
-    // 🔥 FIXED: Camera setup with PERFECT persistence
+    // Camera setup with persistence
     const setupCamera = async () => {
         console.log('🎥 Setting up PERSISTENT camera for MTG Scanner Pro...');
         setCameraStatus('requesting');
@@ -143,7 +284,6 @@ const Scanner = () => {
                 throw new Error('Camera API not supported in this browser');
             }
 
-            // 🔥 FIXED: Check if camera stream already exists and is active
             if (cameraStreamRef.current && cameraStreamRef.current.active) {
                 console.log('📷 Camera stream already active, reusing persistent stream...');
                 
@@ -192,7 +332,6 @@ const Scanner = () => {
                 console.log('✅ Using fallback camera settings');
             }
             
-            // 🔥 FIXED: Store camera stream PERSISTENTLY - this is the key!
             cameraStreamRef.current = stream;
             setCameraInitializationComplete(true);
             
@@ -204,7 +343,7 @@ const Scanner = () => {
                     setCameraError(null);
                     setCameraRetryCount(0);
                     console.log('✅ PERSISTENT Camera ready:', `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
-                    showCameraMessage('✅ Persistent camera ready for scanning!', 'success');
+                    showCameraMessage('✅ Camera ready with smart cooldown!', 'success');
                 };
             }
             
@@ -264,7 +403,7 @@ const Scanner = () => {
         console.log('🔄 Manual camera retry requested');
         setCameraRetryCount(0);
         setCameraError(null);
-        setCameraInitializationComplete(false); // Reset initialization flag
+        setCameraInitializationComplete(false);
         initializationPromiseRef.current = null;
         setupCamera();
     };
@@ -296,6 +435,7 @@ const Scanner = () => {
         }, 3000);
     };
 
+    // 🔥 MODIFIED: Smart scanning with cooldown system
     const startScanning = () => {
         if (!visionServiceRef.current || cameraStatus !== 'ready') {
             console.log('⚠️ MTG Scanner not ready');
@@ -305,27 +445,68 @@ const Scanner = () => {
             return;
         }
         
-        console.log(`▶️ Starting MTG Scanner Pro - ${scanMode} mode...`);
+        console.log(`▶️ Starting MTG Scanner Pro with Smart Cooldown - ${scanMode} mode...`);
         setIsScanning(true);
         setScanningPausedForSelection(false);
+        
+        // 🔥 Reset cooldowns when starting scanning
+        cooldownSystemRef.current.resetCooldowns();
+        setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
         
         if (scanMode === 'continuous') {
             setContinuousCount(0);
             console.log('🔄 Continuous mode: Reset counter to 0');
         }
         
+        // 🔥 MODIFIED: Smart scanning interval with cooldown logic
         scanIntervalRef.current = setInterval(async () => {
-            // Don't scan if edition selector is showing
-            if (scanningPausedForSelection || showEditionSelector) {
-                console.log('⏸️ Scanning paused for edition selection');
-                return;
-            }
-            
             try {
+                // 🔥 Check cooldown system first
+                const currentCardName = currentCard?.cardName;
+                if (!cooldownSystemRef.current.shouldScan(currentCardName)) {
+                    // Update cooldown status for UI
+                    setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
+                    return; // Skip this frame due to cooldown
+                }
+
+                // Don't scan if edition selector is showing
+                if (scanningPausedForSelection || showEditionSelector) {
+                    console.log('⏸️ Scanning paused for edition selection');
+                    cooldownSystemRef.current.setEditionSelectorOpen(true);
+                    return;
+                } else {
+                    cooldownSystemRef.current.setEditionSelectorOpen(false);
+                }
+
+                // 🔥 Frame change detection
+                const canvas = document.createElement('canvas');
+                const video = videoRef.current;
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                
+                // Get frame data for change detection
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // 🔥 Check if frame has changed significantly
+                if (!cooldownSystemRef.current.hasFrameChanged(imageData.data)) {
+                    console.log("📷 Frame unchanged, skipping scan");
+                    return;
+                }
+
+                console.log("🔄 Processing frame for MTG CARD IDENTIFICATION...");
+                
+                // Call the vision service
                 const result = await visionServiceRef.current.processVideoFrame(videoRef.current);
                 
                 if (result && result.hasCard && result.confidence >= 70) {
                     console.log('🎯 MTG Card detected:', result.cardName, `(${result.confidence}%)`);
+                    
+                    // 🔥 Record detection in cooldown system
+                    cooldownSystemRef.current.recordDetection(result.cardName);
+                    setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
                     
                     // Stop scanning in single mode when card detected
                     if (scanMode === 'single') {
@@ -340,6 +521,9 @@ const Scanner = () => {
                     setCurrentCard(null);
                 }
                 
+                // Update cooldown status
+                setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
+                
             } catch (error) {
                 console.error('❌ Scanning error:', error);
                 setScanResult({ hasCard: false, message: 'Scanner error - please try again' });
@@ -347,7 +531,7 @@ const Scanner = () => {
         }, scanMode === 'single' ? 500 : 1000);
     };
 
-    // FIXED: Proper pause control during edition selection
+    // Handle card detection with cooldown integration
     const handleCardDetection = async (detectedCard) => {
         try {
             console.log('🎭 Checking for multiple editions of:', detectedCard.cardName);
@@ -368,7 +552,6 @@ const Scanner = () => {
                 
                 console.log(`📊 Scryfall returned ${editions.length} total results`);
                 
-                // Filter to exact name matches only
                 const exactMatches = editions.filter(card => {
                     const cardNameNormalized = card.name.toLowerCase().trim();
                     const searchNameNormalized = cardName.toLowerCase().trim();
@@ -382,33 +565,27 @@ const Scanner = () => {
                 });
                 
                 if (exactMatches.length > 1) {
-                    // FIXED: Properly pause scanning during edition selection
+                    // 🔥 Notify cooldown system of edition selector opening
                     console.log(`🎭 Multiple editions found - pausing scanner for selection`);
-                    
-                    // CRITICAL: Pause scanning immediately
                     setScanningPausedForSelection(true);
+                    cooldownSystemRef.current.setEditionSelectorOpen(true);
                     
-                    // Sort editions by AI learning preferences
                     const sortedEditions = sortEditionsByPreference(cardName, exactMatches);
                     
-                    // Store the pending card data and scan mode
                     setPendingCardData(detectedCard);
                     setPendingScanMode(scanMode);
                     setAvailableEditions(sortedEditions);
                     setShowEditionSelector(true);
                     
-                    // Clear current display while waiting for selection
                     setScanResult(null);
                     setCurrentCard(null);
                     return;
                     
                 } else if (exactMatches.length === 1) {
-                    // Single edition - use it directly
                     console.log(`✅ Single edition found: ${exactMatches[0].set_name} (${exactMatches[0].set.toUpperCase()})`);
                     const enhancedCard = enhanceCardWithScryfall(detectedCard, exactMatches[0]);
                     displayCard(enhancedCard);
                     
-                    // Auto-save in continuous mode
                     if (scanMode === 'continuous' && autoSaveEnabled) {
                         const saved = await saveCardToCollection(enhancedCard);
                         if (saved) {
@@ -418,7 +595,6 @@ const Scanner = () => {
                     }
                     
                 } else {
-                    // No exact matches - use original detection
                     console.log('⚠️ No exact Scryfall matches found, using original detection');
                     displayCard(detectedCard);
                     
@@ -449,18 +625,16 @@ const Scanner = () => {
         if (userPreference) {
             console.log(`🧠 AI Learning: User previously preferred ${userPreference} for ${cardName}`);
             
-            // Sort to put preferred edition first
             return editions.sort((a, b) => {
                 if (a.set === userPreference) return -1;
                 if (b.set === userPreference) return 1;
-                return 0; // Keep original order for the rest
+                return 0;
             });
         }
         
-        return editions; // No preference, return original order
+        return editions;
     };
 
-    // Learn user's edition preference
     const learnEditionPreference = (cardName, selectedEdition) => {
         const cardKey = cardName.toLowerCase().trim();
         const newPreferences = {
@@ -489,6 +663,8 @@ const Scanner = () => {
         console.log('🔄 User chose to continue scanning...');
         setShowContinueDialog(false);
         setContinuousCount(0);
+        // 🔥 Reset cooldowns when continuing
+        cooldownSystemRef.current.resetCooldowns();
         startScanning();
     };
 
@@ -533,7 +709,7 @@ const Scanner = () => {
         });
     };
 
-    // Handle edition selection and properly resume scanning
+    // Handle edition selection with cooldown integration
     const handleEditionSelected = async (selectedEdition) => {
         if (pendingCardData && selectedEdition) {
             const enhancedCard = enhanceCardWithScryfall(pendingCardData, selectedEdition);
@@ -541,10 +717,8 @@ const Scanner = () => {
             
             console.log(`✅ User selected: ${selectedEdition.set_name} (${selectedEdition.set.toUpperCase()})`);
             
-            // Learn the user's preference for AI
             learnEditionPreference(pendingCardData.cardName, selectedEdition);
             
-            // Handle post-selection behavior based on original scan mode
             if (pendingScanMode === 'continuous' && autoSaveEnabled) {
                 const saved = await saveCardToCollection(enhancedCard);
                 if (saved) {
@@ -552,11 +726,12 @@ const Scanner = () => {
                     handleContinuousCounterAndLimit();
                 }
                 
-                // Resume continuous scanning if we haven't hit the limit
                 if (continuousCount < 9) {
                     console.log('🔄 Resuming continuous scanning after edition selection...');
                     setTimeout(() => {
-                        setScanningPausedForSelection(false); // Resume scanning
+                        setScanningPausedForSelection(false);
+                        // 🔥 Reset cooldowns after edition selection
+                        cooldownSystemRef.current.setEditionSelectorOpen(false);
                         if (!isScanning) {
                             startScanning();
                         }
@@ -565,20 +740,20 @@ const Scanner = () => {
             }
         }
         
-        // Close edition selector and reset state
+        // 🔥 Close edition selector and notify cooldown system
         setShowEditionSelector(false);
         setAvailableEditions([]);
         setPendingCardData(null);
         setPendingScanMode(null);
         setScanningPausedForSelection(false);
+        cooldownSystemRef.current.setEditionSelectorOpen(false);
+        setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
     };
 
     const handleEditionCancelled = async () => {
-        // Use original detection without Scryfall enhancement
         if (pendingCardData) {
             displayCard(pendingCardData);
             
-            // Handle post-cancellation behavior
             if (pendingScanMode === 'continuous' && autoSaveEnabled) {
                 const saved = await saveCardToCollection(pendingCardData);
                 if (saved) {
@@ -586,11 +761,11 @@ const Scanner = () => {
                     handleContinuousCounterAndLimit();
                 }
                 
-                // Resume continuous scanning if appropriate
                 if (continuousCount < 9) {
                     console.log('🔄 Resuming continuous scanning after cancellation...');
                     setTimeout(() => {
                         setScanningPausedForSelection(false);
+                        cooldownSystemRef.current.setEditionSelectorOpen(false);
                         if (!isScanning) {
                             startScanning();
                         }
@@ -599,14 +774,17 @@ const Scanner = () => {
             }
         }
         
+        // 🔥 Close edition selector and notify cooldown system
         setShowEditionSelector(false);
         setAvailableEditions([]);
         setPendingCardData(null);
         setPendingScanMode(null);
         setScanningPausedForSelection(false);
+        cooldownSystemRef.current.setEditionSelectorOpen(false);
+        setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
     };
 
-    // 🔥 FIXED: Stop scanning but keep camera active for persistence
+    // Stop scanning but keep camera active
     const stopScanning = () => {
         console.log('⏹️ Stopping MTG Scanner (camera stays active for persistence)...');
         setIsScanning(false);
@@ -617,16 +795,14 @@ const Scanner = () => {
             scanIntervalRef.current = null;
         }
         
-        // 🔥 NOTE: DO NOT stop camera here - keep it active for tab switching
         console.log('📷 Camera stream preserved for tab persistence');
     };
 
-    // 🔥 FIXED: Only cleanup camera on component unmount
+    // Only cleanup camera on component unmount
     const cleanup = () => {
         console.log('🧹 Cleaning up MTG Scanner...');
         stopScanning();
         
-        // 🔥 FIXED: Only stop camera on actual component unmount
         if (cameraStreamRef.current) {
             console.log('📷 Stopping persistent camera stream...');
             cameraStreamRef.current.getTracks().forEach(track => track.stop());
@@ -643,14 +819,13 @@ const Scanner = () => {
         initializationPromiseRef.current = null;
     };
 
-    // Collection with limits and paywall
+    // Collection management
     const saveCardToCollection = async (card) => {
         try {
-            // Check collection limit for free users
             if (!isPremiumUser && savedCards.length >= FREE_COLLECTION_LIMIT) {
                 console.log('🚨 Free collection limit reached');
                 setShowPaywallModal(true);
-                return false; // Don't save the card
+                return false;
             }
             
             const cardWithId = {
@@ -683,7 +858,7 @@ const Scanner = () => {
                 }, 3000);
             }
             
-            return true; // Successfully saved
+            return true;
             
         } catch (error) {
             console.error('❌ Failed to save card:', error);
@@ -695,23 +870,18 @@ const Scanner = () => {
         }
     };
 
-    // PayPal integration for premium upgrade
     const handleUpgradeToPremium = () => {
         console.log('💎 Initiating PayPal payment for premium upgrade...');
         
-        // Create PayPal payment link
         const paypalLink = `https://www.paypal.com/paypalme/thediceyguy/9.99?country.x=US&locale.x=en_US`;
-        
-        // Open PayPal in new window
         window.open(paypalLink, '_blank');
         
-        // Show success message (in real app, you'd verify payment)
         setTimeout(() => {
             setIsPremiumUser(true);
             localStorage.setItem('mtg_premium_status', 'true');
             setShowPaywallModal(false);
             showCameraMessage('💎 Premium upgrade successful! Unlimited collection storage activated.', 'success');
-        }, 5000); // Simulate payment verification delay
+        }, 5000);
     };
 
     const removeCardFromCollection = (cardId) => {
@@ -738,12 +908,11 @@ const Scanner = () => {
         console.log('👁️ UI visibility toggled:', !isUIVisible);
     };
 
-    // 🔥 FIXED: Tab switching handler that preserves camera
+    // Tab switching handler that preserves camera
     const handleTabSwitch = (newTab) => {
         console.log(`🔄 Switching from ${activeTab} to ${newTab} (camera preserved)`);
         setActiveTab(newTab);
         
-        // 🔥 If returning to scanner tab, ensure video is connected
         if (newTab === 'scanner' && cameraStreamRef.current && videoRef.current) {
             setTimeout(() => {
                 if (!videoRef.current.srcObject) {
@@ -762,12 +931,52 @@ const Scanner = () => {
             case 'requesting':
                 return { text: '📷 Requesting access...', class: 'status-requesting' };
             case 'ready':
-                return { text: '✅ HD Camera Ready (Persistent)', class: 'status-ready' };
+                return { text: '✅ HD Camera Ready + Smart Cooldown', class: 'status-ready' };
             case 'error':
                 return { text: '❌ Camera Error', class: 'status-error' };
             default:
                 return { text: '⏳ Setting up...', class: 'status-default' };
         }
+    };
+
+    // 🔥 NEW: Render cooldown status UI
+    const renderCooldownStatus = () => {
+        if (!cooldownStatus || activeTab !== 'scanner') return null;
+        
+        return (
+            <div style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                background: 'rgba(0,0,0,0.8)',
+                color: 'white',
+                padding: '12px',
+                borderRadius: '8px',
+                fontSize: '11px',
+                fontFamily: 'monospace',
+                border: '1px solid #4a90e2',
+                minWidth: '200px',
+                zIndex: 1000
+            }}>
+                <div style={{color: '#4a90e2', fontWeight: 'bold', marginBottom: '6px'}}>
+                    🔥 Smart Cooldown System
+                </div>
+                <div>API Cooldown: {Math.ceil(cooldownStatus.apiCooldown / 1000)}s</div>
+                <div>Same Card: {Math.ceil(cooldownStatus.sameCardCooldown / 1000)}s</div>
+                <div>Consecutive: {cooldownStatus.consecutiveDetections}/3</div>
+                <div>Edition Selector: {cooldownStatus.isEditionSelectorOpen ? '🎭 Open' : '✅ Closed'}</div>
+                <div style={{
+                    marginTop: '6px', 
+                    padding: '4px', 
+                    background: cooldownStatus.canScan ? 'rgba(40, 167, 69, 0.3)' : 'rgba(220, 53, 69, 0.3)',
+                    borderRadius: '4px',
+                    textAlign: 'center',
+                    fontWeight: 'bold'
+                }}>
+                    {cooldownStatus.canScan ? '✅ Can Scan' : '❌ Cooldown Active'}
+                </div>
+            </div>
+        );
     };
 
     const cameraStatus_display = getCameraStatusDisplay();
@@ -787,7 +996,7 @@ const Scanner = () => {
                     <div className="app-title">
                         <h1>MTG Scanner Pro</h1>
                         <span className="app-subtitle">
-                            🎯 Camera Persistence FIXED • {isPremiumUser ? '💎 Premium' : `${FREE_COLLECTION_LIMIT - savedCards.length} cards left`}
+                            🔥 Smart Cooldown System • {isPremiumUser ? '💎 Premium' : `${FREE_COLLECTION_LIMIT - savedCards.length} cards left`}
                         </span>
                     </div>
                 </div>
@@ -802,6 +1011,10 @@ const Scanner = () => {
                         <span className="stat-value">{Object.keys(editionPreferences).length}</span>
                     </div>
                     <div className="stat-item">
+                        <span className="stat-label">Cooldowns:</span>
+                        <span className="stat-value">{cooldownStatus.canScan ? '✅' : '⏸️'}</span>
+                    </div>
+                    <div className="stat-item">
                         <span className="stat-label">Saved:</span>
                         <span className="stat-value">
                             {savedCards.length}{!isPremiumUser && `/${FREE_COLLECTION_LIMIT}`}
@@ -810,13 +1023,13 @@ const Scanner = () => {
                 </div>
             </div>
 
-            {/* Tab Navigation - FIXED: Use handleTabSwitch */}
+            {/* Tab Navigation */}
             <div className="tab-navigation">
                 <button
                     className={`tab-btn ${activeTab === 'scanner' ? 'active' : ''}`}
                     onClick={() => handleTabSwitch('scanner')}
                 >
-                    🔍 Scanner {scanningPausedForSelection && '⏸️'} {cameraInitializationComplete && '✅'}
+                    🔍 Scanner {scanningPausedForSelection && '⏸️'} {cooldownStatus.canScan ? '🔥' : '⏳'}
                 </button>
                 <button
                     className={`tab-btn ${activeTab === 'deck' ? 'active' : ''}`}
@@ -848,6 +1061,9 @@ const Scanner = () => {
                                     playsInline
                                     muted
                                 />
+                                
+                                {/* 🔥 NEW: Cooldown Status Overlay */}
+                                {renderCooldownStatus()}
                                 
                                 {/* Camera Status Overlay */}
                                 <div className="camera-status-overlay">
@@ -884,8 +1100,8 @@ const Scanner = () => {
                                             🔍 Position MTG card in frame
                                             <div className="scan-tech">
                                                 {scanMode === 'continuous' ? 
-                                                    `🔄 AI learning mode (${continuousCount}/10)` : 
-                                                    '📷 Single shot with AI learning'
+                                                    `🔥 Smart cooldown mode (${continuousCount}/10)` : 
+                                                    '📷 Single shot with smart cooldown'
                                                 }
                                             </div>
                                         </div>
@@ -917,14 +1133,14 @@ const Scanner = () => {
                                             onClick={() => setScanMode('continuous')}
                                             disabled={isScanning || showEditionSelector}
                                         >
-                                            🔄 Continuous {scanMode === 'continuous' && `(${continuousCount}/10)`}
+                                            🔥 Smart Continuous {scanMode === 'continuous' && `(${continuousCount}/10)`}
                                         </button>
                                         <button
                                             className={`mode-btn ${scanMode === 'single' ? 'active' : ''}`}
                                             onClick={() => setScanMode('single')}
                                             disabled={isScanning || showEditionSelector}
                                         >
-                                            📷 Single Shot
+                                            📷 Smart Single Shot
                                         </button>
                                     </div>
                                 </div>
@@ -937,8 +1153,8 @@ const Scanner = () => {
                                 >
                                     {showEditionSelector ? '🎭 Choose Edition Below' :
                                      scanningPausedForSelection ? '⏸️ Paused for Selection' :
-                                     isScanning ? '⏹️ Stop Scanning' : 
-                                     `▶️ Start ${scanMode === 'single' ? 'Single' : 'Continuous'} Scan`}
+                                     isScanning ? '⏹️ Stop Smart Scanning' : 
+                                     `🔥 Start Smart ${scanMode === 'single' ? 'Single' : 'Continuous'} Scan`}
                                 </button>
                                 
                                 {/* Camera Retry Button */}
@@ -960,28 +1176,16 @@ const Scanner = () => {
                                     {isUIVisible ? '👁️ Hide Info' : '👁️ Show Info'}
                                 </button>
 
-                                {/* Debug Edition Test Button */}
+                                {/* 🔥 NEW: Reset Cooldowns Button */}
                                 <button
                                     className="debug-btn"
                                     onClick={() => {
-                                        console.log('🧪 Testing AI learning for Lightning Bolt...');
-                                        handleCardDetection({
-                                            cardName: 'Lightning Bolt',
-                                            confidence: 95,
-                                            timestamp: new Date().toISOString(),
-                                            hasCard: true
-                                        });
+                                        cooldownSystemRef.current.resetCooldowns();
+                                        setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
+                                        console.log('🔄 Cooldowns manually reset');
+                                        showCameraMessage('🔄 Cooldowns reset!', 'success');
                                     }}
-                                    title="Test AI learning"
-                                >
-                                    🧪 Test AI Learning
-                                </button>
-
-                                {/* Test Tab Switch Button */}
-                                <button
-                                    className="test-persistence-btn"
-                                    onClick={() => handleTabSwitch('deck')}
-                                    disabled={cameraStatus !== 'ready'}
+                                    title="Reset all cooldowns"
                                     style={{
                                         background: '#28a745',
                                         color: 'white',
@@ -992,7 +1196,7 @@ const Scanner = () => {
                                         fontSize: '12px'
                                     }}
                                 >
-                                    🧪 Test Tab Switch (Camera Persists)
+                                    🔄 Reset Cooldowns
                                 </button>
                             </div>
                         </div>
@@ -1015,35 +1219,6 @@ const Scanner = () => {
                 {/* Collection/Deck Tab */}
                 {activeTab === 'deck' && (
                     <div className="deck-tab">
-                        <div style={{ padding: '20px', textAlign: 'center' }}>
-                            <h2>🃏 Collection Management</h2>
-                            <p style={{color: '#4a90e2', fontSize: '1.1rem', margin: '15px 0'}}>
-                                ✅ Camera is still active in the background!
-                            </p>
-                            <p>You have {savedCards.length} cards saved.</p>
-                            <div style={{margin: '20px 0', padding: '15px', background: 'rgba(40, 167, 69, 0.1)', borderRadius: '8px', border: '1px solid #28a745'}}>
-                                <p style={{color: '#28a745', fontWeight: 'bold'}}>🎯 Camera Persistence Test:</p>
-                                <p style={{color: '#ccc', fontSize: '0.9rem', margin: '5px 0'}}>
-                                    The camera stream is preserved across tabs. 
-                                    When you return to Scanner, it will reconnect instantly!
-                                </p>
-                            </div>
-                            <button 
-                                onClick={() => handleTabSwitch('scanner')}
-                                style={{
-                                    background: '#4a90e2',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '12px 24px',
-                                    borderRadius: '6px',
-                                    fontSize: '16px',
-                                    cursor: 'pointer',
-                                    marginTop: '20px'
-                                }}
-                            >
-                                🔙 Back to Scanner (Instant Reconnect)
-                            </button>
-                        </div>
                         <DeckManager 
                             savedCards={savedCards}
                             onRemoveCard={removeCardFromCollection}
@@ -1059,27 +1234,6 @@ const Scanner = () => {
                 {/* Knowledge Tab */}
                 {activeTab === 'knowledge' && (
                     <div className="knowledge-tab">
-                        <div style={{ padding: '20px', textAlign: 'center' }}>
-                            <h2>📚 MTG Knowledge Base</h2>
-                            <p style={{color: '#4a90e2', fontSize: '1.1rem', margin: '15px 0'}}>
-                                ✅ Camera persistence works across all tabs!
-                            </p>
-                            <button 
-                                onClick={() => handleTabSwitch('scanner')}
-                                style={{
-                                    background: '#4a90e2',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '12px 24px',
-                                    borderRadius: '6px',
-                                    fontSize: '16px',
-                                    cursor: 'pointer',
-                                    marginTop: '20px'
-                                }}
-                            >
-                                🔙 Back to Scanner (Camera Preserved)
-                            </button>
-                        </div>
                         <MTGKnowledgeBase 
                             currentCard={currentCard}
                             savedCards={savedCards}
@@ -1111,6 +1265,7 @@ const Scanner = () => {
                         />
                         MTG Scanner
                     </div>
+                    <span className="status-item">🔥 Smart Cooldown: {cooldownStatus.canScan ? 'Ready' : 'Active'}</span>
                     <span className="status-item">
                         📷 Camera: {cameraInitializationComplete ? 'Persistent ✅' : 'Initializing ⏳'}
                     </span>
@@ -1261,10 +1416,10 @@ const Scanner = () => {
                         boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
                     }}>
                         <h3 style={{ margin: '0 0 16px 0', color: '#4a90e2', fontSize: '20px' }}>
-                            🎯 10 Cards Scanned!
+                            🔥 10 Cards Scanned with Smart Cooldown!
                         </h3>
                         <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
-                            You've successfully scanned <strong>10 cards</strong> with AI learning.
+                            You've successfully scanned <strong>10 cards</strong> with the smart cooldown system.
                         </p>
                         <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
                             AI learned <strong>{Object.keys(editionPreferences).length}</strong> edition preferences.
@@ -1292,7 +1447,7 @@ const Scanner = () => {
                                     color: 'white'
                                 }}
                             >
-                                🔄 Continue Scanning
+                                🔥 Continue Smart Scanning
                             </button>
                             <button 
                                 onClick={handleStopScanning}
@@ -1320,7 +1475,7 @@ const Scanner = () => {
                             fontSize: '12px',
                             color: '#ccc'
                         }}>
-                            <span>📊 Session: {continuousCount} cards</span>
+                            <span>🔥 Smart scans: {continuousCount}</span>
                             <span>🧠 AI learned: {Object.keys(editionPreferences).length}</span>
                             <span>📁 Collection: {savedCards.length} total</span>
                         </div>

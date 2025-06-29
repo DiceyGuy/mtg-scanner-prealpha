@@ -1,4 +1,4 @@
-// Scanner.js - MTG Scanner with Smart Cooldown System - COMPLETE INTEGRATED VERSION
+// Scanner.js - Complete MTG Scanner with Smart Cooldown System
 import React, { useState, useRef, useEffect } from 'react';
 import ClaudeVisionService from './ClaudeVisionService';
 import CardDisplayUI from './CardDisplayUI';
@@ -153,7 +153,7 @@ const Scanner = () => {
     // Smart scanning state
     const [continuousCount, setContinuousCount] = useState(0);
     const [showContinueDialog, setShowContinueDialog] = useState(false);
-    const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+    const [autoSaveEnabled] = useState(true);
     
     // 🔥 NEW: Cooldown system state
     const [cooldownStatus, setCooldownStatus] = useState({});
@@ -235,7 +235,7 @@ const Scanner = () => {
             console.log('⏸️ Pausing scanning - left scanner tab (camera stays active)');
             stopScanning();
         }
-    }, [activeTab]);
+    }, [activeTab, isScanning]);
 
     const initializeServices = () => {
         console.log('🔧 Initializing MTG Scanner Pro...');

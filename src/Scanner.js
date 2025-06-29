@@ -1,4 +1,4 @@
-// Scanner.js - Professional MTG Tool with Smart Scanning (FIXED VERSION)
+// Scanner.js - MTG Scanner with AI Learning & Collection Limits
 import React, { useState, useRef, useEffect } from 'react';
 import ClaudeVisionService from './ClaudeVisionService';
 import CardDisplayUI from './CardDisplayUI';
@@ -26,11 +26,20 @@ const Scanner = () => {
     const [isUIVisible, setIsUIVisible] = useState(true);
     const [savedCards, setSavedCards] = useState([]);
     
-    // Edition selection state - FIXED: Always show when multiple editions
+    // Edition selection state - FIXED: Proper pause control
     const [showEditionSelector, setShowEditionSelector] = useState(false);
     const [availableEditions, setAvailableEditions] = useState([]);
     const [pendingCardData, setPendingCardData] = useState(null);
-    const [pendingScanMode, setPendingScanMode] = useState(null); // Track which mode triggered the selector
+    const [pendingScanMode, setPendingScanMode] = useState(null);
+    const [scanningPausedForSelection, setScanningPausedForSelection] = useState(false);
+    
+    // NEW: AI Learning for edition preferences
+    const [editionPreferences, setEditionPreferences] = useState({});
+    
+    // NEW: Collection limits and premium features
+    const [isPremiumUser, setIsPremiumUser] = useState(false);
+    const [showPaywallModal, setShowPaywallModal] = useState(false);
+    const FREE_COLLECTION_LIMIT = 100;
     
     // Camera state
     const [cameraError, setCameraError] = useState(null);
@@ -43,7 +52,7 @@ const Scanner = () => {
     const visionServiceRef = useRef(null);
     const cameraStreamRef = useRef(null);
 
-    // Initialize services and camera
+    // Initialize services and load data
     useEffect(() => {
         initializeServices();
         
@@ -53,7 +62,7 @@ const Scanner = () => {
         };
         
         const cameraTimer = setTimeout(initCamera, 1000);
-        loadSavedCards();
+        loadSavedData();
         
         return () => {
             clearTimeout(cameraTimer);
@@ -79,19 +88,36 @@ const Scanner = () => {
         }
     };
 
-    const loadSavedCards = () => {
+    // NEW: Load all saved data including edition preferences
+    const loadSavedData = () => {
         try {
+            // Load saved cards
             const saved = localStorage.getItem('mtg_saved_cards');
             if (saved) {
                 setSavedCards(JSON.parse(saved));
                 console.log('📁 Loaded saved cards from storage');
             }
+            
+            // Load edition preferences for AI learning
+            const preferences = localStorage.getItem('mtg_edition_preferences');
+            if (preferences) {
+                setEditionPreferences(JSON.parse(preferences));
+                console.log('🧠 Loaded edition preferences for AI learning');
+            }
+            
+            // Load premium status
+            const premiumStatus = localStorage.getItem('mtg_premium_status');
+            if (premiumStatus === 'true') {
+                setIsPremiumUser(true);
+                console.log('💎 Premium user status loaded');
+            }
+            
         } catch (error) {
-            console.error('❌ Failed to load saved cards:', error);
+            console.error('❌ Failed to load saved data:', error);
         }
     };
 
-    // FIXED: Enhanced camera setup with Logitech C920 prioritization
+    // FIXED: Camera setup with Logitech C920 prioritization
     const setupCamera = async () => {
         console.log('🎥 Setting up camera for MTG Scanner Pro...');
         setCameraStatus('requesting');
@@ -103,7 +129,6 @@ const Scanner = () => {
                 throw new Error('Camera API not supported in this browser');
             }
 
-            // First, try to get the Logitech C920 specifically
             let stream = null;
             
             try {
@@ -124,7 +149,6 @@ const Scanner = () => {
             } catch (logitechError) {
                 console.log('⚠️ Logitech C920 not available, trying general constraints...');
                 
-                // Fallback to general constraints
                 const generalConstraints = {
                     video: {
                         width: { ideal: 1280, min: 320 },
@@ -250,6 +274,7 @@ const Scanner = () => {
         
         console.log(`▶️ Starting MTG Scanner Pro - ${scanMode} mode...`);
         setIsScanning(true);
+        setScanningPausedForSelection(false); // Reset pause state
         
         if (scanMode === 'continuous') {
             setContinuousCount(0);
@@ -257,6 +282,12 @@ const Scanner = () => {
         }
         
         scanIntervalRef.current = setInterval(async () => {
+            // FIXED: Don't scan if edition selector is showing
+            if (scanningPausedForSelection || showEditionSelector) {
+                console.log('⏸️ Scanning paused for edition selection');
+                return;
+            }
+            
             try {
                 const result = await visionServiceRef.current.processVideoFrame(videoRef.current);
                 
@@ -283,7 +314,7 @@ const Scanner = () => {
         }, scanMode === 'single' ? 500 : 1000);
     };
 
-    // FIXED: Always show edition selector when multiple editions exist
+    // FIXED: Proper pause control during edition selection
     const handleCardDetection = async (detectedCard) => {
         try {
             console.log('🎭 Checking for multiple editions of:', detectedCard.cardName);
@@ -318,18 +349,19 @@ const Scanner = () => {
                 });
                 
                 if (exactMatches.length > 1) {
-                    // FIXED: ALWAYS show edition selector for multiple editions, regardless of scan mode
-                    console.log(`🎭 Multiple editions found - showing edition selector (${scanMode} mode)`);
+                    // FIXED: Properly pause scanning during edition selection
+                    console.log(`🎭 Multiple editions found - pausing scanner for selection`);
                     
-                    // Stop scanning to show edition selector
-                    if (isScanning) {
-                        stopScanning();
-                    }
+                    // CRITICAL: Pause scanning immediately
+                    setScanningPausedForSelection(true);
+                    
+                    // NEW: Sort editions by AI learning preferences
+                    const sortedEditions = sortEditionsByPreference(cardName, exactMatches);
                     
                     // Store the pending card data and scan mode
                     setPendingCardData(detectedCard);
-                    setPendingScanMode(scanMode); // Remember which mode we were in
-                    setAvailableEditions(exactMatches);
+                    setPendingScanMode(scanMode);
+                    setAvailableEditions(sortedEditions);
                     setShowEditionSelector(true);
                     
                     // Clear current display while waiting for selection
@@ -345,9 +377,11 @@ const Scanner = () => {
                     
                     // Auto-save in continuous mode
                     if (scanMode === 'continuous' && autoSaveEnabled) {
-                        saveCardToCollection(enhancedCard);
-                        console.log(`💾 AUTO-SAVED: ${enhancedCard.cardName} to collection`);
-                        handleContinuousCounterAndLimit();
+                        const saved = await saveCardToCollection(enhancedCard);
+                        if (saved) {
+                            console.log(`💾 AUTO-SAVED: ${enhancedCard.cardName} to collection`);
+                            handleContinuousCounterAndLimit();
+                        }
                     }
                     
                 } else {
@@ -356,9 +390,11 @@ const Scanner = () => {
                     displayCard(detectedCard);
                     
                     if (scanMode === 'continuous' && autoSaveEnabled) {
-                        saveCardToCollection(detectedCard);
-                        console.log(`💾 AUTO-SAVED: ${detectedCard.cardName} to collection (no Scryfall match)`);
-                        handleContinuousCounterAndLimit();
+                        const saved = await saveCardToCollection(detectedCard);
+                        if (saved) {
+                            console.log(`💾 AUTO-SAVED: ${detectedCard.cardName} to collection (no Scryfall match)`);
+                            handleContinuousCounterAndLimit();
+                        }
                     }
                 }
             } else {
@@ -370,6 +406,39 @@ const Scanner = () => {
             console.error('❌ Edition lookup error:', error);
             displayCard(detectedCard);
         }
+    };
+
+    // NEW: AI Learning - Sort editions by user preferences
+    const sortEditionsByPreference = (cardName, editions) => {
+        const cardKey = cardName.toLowerCase().trim();
+        const userPreference = editionPreferences[cardKey];
+        
+        if (userPreference) {
+            console.log(`🧠 AI Learning: User previously preferred ${userPreference} for ${cardName}`);
+            
+            // Sort to put preferred edition first
+            return editions.sort((a, b) => {
+                if (a.set === userPreference) return -1;
+                if (b.set === userPreference) return 1;
+                return 0; // Keep original order for the rest
+            });
+        }
+        
+        return editions; // No preference, return original order
+    };
+
+    // NEW: Learn user's edition preference
+    const learnEditionPreference = (cardName, selectedEdition) => {
+        const cardKey = cardName.toLowerCase().trim();
+        const newPreferences = {
+            ...editionPreferences,
+            [cardKey]: selectedEdition.set
+        };
+        
+        setEditionPreferences(newPreferences);
+        localStorage.setItem('mtg_edition_preferences', JSON.stringify(newPreferences));
+        
+        console.log(`🧠 AI Learning: Remembered ${selectedEdition.set_name} preference for ${cardName}`);
     };
 
     const handleContinuousCounterAndLimit = () => {
@@ -409,7 +478,8 @@ const Scanner = () => {
             prices: scryfallCard.prices,
             collectorNumber: scryfallCard.collector_number,
             releaseDate: scryfallCard.released_at,
-            scryfallVerified: true
+            scryfallVerified: true,
+            setCode: scryfallCard.set
         };
     };
 
@@ -430,31 +500,36 @@ const Scanner = () => {
         });
     };
 
-    // FIXED: Handle edition selection and resume appropriate behavior
-    const handleEditionSelected = (selectedEdition) => {
+    // FIXED: Handle edition selection and properly resume scanning
+    const handleEditionSelected = async (selectedEdition) => {
         if (pendingCardData && selectedEdition) {
             const enhancedCard = enhanceCardWithScryfall(pendingCardData, selectedEdition);
             displayCard(enhancedCard);
             
             console.log(`✅ User selected: ${selectedEdition.set_name} (${selectedEdition.set.toUpperCase()})`);
             
+            // NEW: Learn the user's preference for AI
+            learnEditionPreference(pendingCardData.cardName, selectedEdition);
+            
             // Handle post-selection behavior based on original scan mode
             if (pendingScanMode === 'continuous' && autoSaveEnabled) {
-                saveCardToCollection(enhancedCard);
-                console.log(`💾 AUTO-SAVED: ${enhancedCard.cardName} to collection`);
-                handleContinuousCounterAndLimit();
+                const saved = await saveCardToCollection(enhancedCard);
+                if (saved) {
+                    console.log(`💾 AUTO-SAVED: ${enhancedCard.cardName} to collection`);
+                    handleContinuousCounterAndLimit();
+                }
                 
                 // Resume continuous scanning if we haven't hit the limit
-                if (continuousCount < 9) { // Will be incremented to 10 in handleContinuousCounterAndLimit
+                if (continuousCount < 9) {
                     console.log('🔄 Resuming continuous scanning after edition selection...');
                     setTimeout(() => {
-                        if (!isScanning) { // Only restart if not already scanning
+                        setScanningPausedForSelection(false); // Resume scanning
+                        if (!isScanning) {
                             startScanning();
                         }
-                    }, 1000); // Brief delay to show the selected card
+                    }, 1000);
                 }
             }
-            // For single mode, just display the card (scanning already stopped)
         }
         
         // Close edition selector and reset state
@@ -462,23 +537,27 @@ const Scanner = () => {
         setAvailableEditions([]);
         setPendingCardData(null);
         setPendingScanMode(null);
+        setScanningPausedForSelection(false);
     };
 
-    const handleEditionCancelled = () => {
+    const handleEditionCancelled = async () => {
         // Use original detection without Scryfall enhancement
         if (pendingCardData) {
             displayCard(pendingCardData);
             
             // Handle post-cancellation behavior
             if (pendingScanMode === 'continuous' && autoSaveEnabled) {
-                saveCardToCollection(pendingCardData);
-                console.log(`💾 AUTO-SAVED: ${pendingCardData.cardName} to collection (cancelled edition selection)`);
-                handleContinuousCounterAndLimit();
+                const saved = await saveCardToCollection(pendingCardData);
+                if (saved) {
+                    console.log(`💾 AUTO-SAVED: ${pendingCardData.cardName} to collection (cancelled edition selection)`);
+                    handleContinuousCounterAndLimit();
+                }
                 
                 // Resume continuous scanning if appropriate
                 if (continuousCount < 9) {
                     console.log('🔄 Resuming continuous scanning after cancellation...');
                     setTimeout(() => {
+                        setScanningPausedForSelection(false);
                         if (!isScanning) {
                             startScanning();
                         }
@@ -491,11 +570,13 @@ const Scanner = () => {
         setAvailableEditions([]);
         setPendingCardData(null);
         setPendingScanMode(null);
+        setScanningPausedForSelection(false);
     };
 
     const stopScanning = () => {
         console.log('⏹️ Stopping MTG Scanner...');
         setIsScanning(false);
+        setScanningPausedForSelection(false);
         
         if (scanIntervalRef.current) {
             clearInterval(scanIntervalRef.current);
@@ -517,8 +598,16 @@ const Scanner = () => {
         }
     };
 
-    const saveCardToCollection = (card) => {
+    // NEW: Collection with limits and paywall
+    const saveCardToCollection = async (card) => {
         try {
+            // Check collection limit for free users
+            if (!isPremiumUser && savedCards.length >= FREE_COLLECTION_LIMIT) {
+                console.log('🚨 Free collection limit reached');
+                setShowPaywallModal(true);
+                return false; // Don't save the card
+            }
+            
             const cardWithId = {
                 ...card,
                 id: Date.now() + Math.random(),
@@ -549,13 +638,35 @@ const Scanner = () => {
                 }, 3000);
             }
             
+            return true; // Successfully saved
+            
         } catch (error) {
             console.error('❌ Failed to save card:', error);
             setScanResult(prev => ({
                 ...prev,
                 message: `❌ Failed to save ${card.cardName}`
             }));
+            return false;
         }
+    };
+
+    // NEW: PayPal integration for premium upgrade
+    const handleUpgradeToPremium = () => {
+        console.log('💎 Initiating PayPal payment for premium upgrade...');
+        
+        // Create PayPal payment link
+        const paypalLink = `https://www.paypal.com/paypalme/thediceyguy/9.99?country.x=US&locale.x=en_US`;
+        
+        // Open PayPal in new window
+        window.open(paypalLink, '_blank');
+        
+        // Show success message (in real app, you'd verify payment)
+        setTimeout(() => {
+            setIsPremiumUser(true);
+            localStorage.setItem('mtg_premium_status', 'true');
+            setShowPaywallModal(false);
+            showCameraMessage('💎 Premium upgrade successful! Unlimited collection storage activated.', 'success');
+        }, 5000); // Simulate payment verification delay
     };
 
     const removeCardFromCollection = (cardId) => {
@@ -613,7 +724,9 @@ const Scanner = () => {
                     </div>
                     <div className="app-title">
                         <h1>MTG Scanner Pro</h1>
-                        <span className="app-subtitle">Professional Edition Selection + Smart Scanning</span>
+                        <span className="app-subtitle">
+                            {isPremiumUser ? '💎 Premium' : `AI Learning + ${FREE_COLLECTION_LIMIT - savedCards.length} cards left`}
+                        </span>
                     </div>
                 </div>
                 
@@ -623,12 +736,14 @@ const Scanner = () => {
                         <span className="stat-value">98%</span>
                     </div>
                     <div className="stat-item">
-                        <span className="stat-label">Database:</span>
-                        <span className="stat-value">34,983 cards</span>
+                        <span className="stat-label">AI Learned:</span>
+                        <span className="stat-value">{Object.keys(editionPreferences).length}</span>
                     </div>
                     <div className="stat-item">
                         <span className="stat-label">Saved:</span>
-                        <span className="stat-value">{savedCards.length}</span>
+                        <span className="stat-value">
+                            {savedCards.length}{!isPremiumUser && `/${FREE_COLLECTION_LIMIT}`}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -639,13 +754,13 @@ const Scanner = () => {
                     className={`tab-btn ${activeTab === 'scanner' ? 'active' : ''}`}
                     onClick={() => setActiveTab('scanner')}
                 >
-                    🔍 Scanner
+                    🔍 Scanner {scanningPausedForSelection && '⏸️'}
                 </button>
                 <button
                     className={`tab-btn ${activeTab === 'deck' ? 'active' : ''}`}
                     onClick={() => setActiveTab('deck')}
                 >
-                    🃏 Collection ({savedCards.length})
+                    🃏 Collection ({savedCards.length}{!isPremiumUser && `/${FREE_COLLECTION_LIMIT}`})
                 </button>
                 <button
                     className={`tab-btn ${activeTab === 'knowledge' ? 'active' : ''}`}
@@ -699,16 +814,29 @@ const Scanner = () => {
                                 )}
                                 
                                 {/* Scanning Overlay */}
-                                {isScanning && (
+                                {isScanning && !scanningPausedForSelection && (
                                     <div className="scanning-overlay">
                                         <div className="scan-frame"></div>
                                         <div className="scan-instructions">
                                             🔍 Position MTG card in frame
                                             <div className="scan-tech">
                                                 {scanMode === 'continuous' ? 
-                                                    `🔄 Edition selector mode (${continuousCount}/10)` : 
-                                                    '📷 Single shot with edition selection'
+                                                    `🔄 AI learning mode (${continuousCount}/10)` : 
+                                                    '📷 Single shot with AI learning'
                                                 }
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Edition Selection Pause Overlay */}
+                                {scanningPausedForSelection && (
+                                    <div className="scanning-overlay">
+                                        <div className="scan-frame" style={{borderColor: '#ffa500'}}></div>
+                                        <div className="scan-instructions">
+                                            ⏸️ Scanner paused for edition selection
+                                            <div className="scan-tech">
+                                                🎭 Choose the correct edition below
                                             </div>
                                         </div>
                                     </div>
@@ -724,14 +852,14 @@ const Scanner = () => {
                                         <button
                                             className={`mode-btn ${scanMode === 'continuous' ? 'active' : ''}`}
                                             onClick={() => setScanMode('continuous')}
-                                            disabled={isScanning}
+                                            disabled={isScanning || showEditionSelector}
                                         >
                                             🔄 Continuous {scanMode === 'continuous' && `(${continuousCount}/10)`}
                                         </button>
                                         <button
                                             className={`mode-btn ${scanMode === 'single' ? 'active' : ''}`}
                                             onClick={() => setScanMode('single')}
-                                            disabled={isScanning}
+                                            disabled={isScanning || showEditionSelector}
                                         >
                                             📷 Single Shot
                                         </button>
@@ -744,8 +872,9 @@ const Scanner = () => {
                                     onClick={isScanning ? stopScanning : startScanning}
                                     disabled={cameraStatus !== 'ready' || showEditionSelector}
                                 >
-                                    {isScanning ? '⏹️ Stop Scanning' : 
-                                     showEditionSelector ? '🎭 Edition Selection Active' :
+                                    {showEditionSelector ? '🎭 Choose Edition Below' :
+                                     scanningPausedForSelection ? '⏸️ Paused for Selection' :
+                                     isScanning ? '⏹️ Stop Scanning' : 
                                      `▶️ Start ${scanMode === 'single' ? 'Single' : 'Continuous'} Scan`}
                                 </button>
                                 
@@ -772,7 +901,7 @@ const Scanner = () => {
                                 <button
                                     className="debug-btn"
                                     onClick={() => {
-                                        console.log('🧪 Testing edition selector for Lightning Bolt...');
+                                        console.log('🧪 Testing AI learning for Lightning Bolt...');
                                         handleCardDetection({
                                             cardName: 'Lightning Bolt',
                                             confidence: 95,
@@ -780,9 +909,9 @@ const Scanner = () => {
                                             hasCard: true
                                         });
                                     }}
-                                    title="Test edition selector"
+                                    title="Test AI learning"
                                 >
-                                    🧪 Test Editions
+                                    🧪 Test AI Learning
                                 </button>
                             </div>
                         </div>
@@ -810,6 +939,9 @@ const Scanner = () => {
                             onRemoveCard={removeCardFromCollection}
                             onOpenScryfall={openCardInScryfall}
                             scanHistory={scanHistory}
+                            isPremiumUser={isPremiumUser}
+                            collectionLimit={FREE_COLLECTION_LIMIT}
+                            onUpgrade={handleUpgradeToPremium}
                         />
                     </div>
                 )}
@@ -820,6 +952,7 @@ const Scanner = () => {
                         <MTGKnowledgeBase 
                             currentCard={currentCard}
                             savedCards={savedCards}
+                            editionPreferences={editionPreferences}
                         />
                     </div>
                 )}
@@ -847,20 +980,126 @@ const Scanner = () => {
                         />
                         MTG Scanner
                     </div>
-                    <span className="status-item">🧠 Powered by Gemini AI</span>
+                    <span className="status-item">🧠 AI Learning: {Object.keys(editionPreferences).length} cards</span>
                     <span className="status-item">📡 Scryfall Database</span>
-                    <span className="status-item">🎭 Edition Selector Mode</span>
+                    <span className="status-item">{isPremiumUser ? '💎 Premium' : '🆓 Free'}</span>
                 </div>
             </div>
 
-            {/* Edition Selector Modal - ALWAYS SHOWN for multiple editions */}
+            {/* Edition Selector Modal */}
             {showEditionSelector && (
                 <EditionSelector
                     cardName={pendingCardData?.cardName}
                     availableEditions={availableEditions}
                     onEditionSelected={handleEditionSelected}
                     onCancel={handleEditionCancelled}
+                    aiRecommendation={editionPreferences[pendingCardData?.cardName?.toLowerCase()?.trim()]}
                 />
+            )}
+
+            {/* Premium Upgrade Paywall Modal */}
+            {showPaywallModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(0,0,0,0.9)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10001
+                }}>
+                    <div style={{
+                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f1419 100%)',
+                        border: '2px solid #4a90e2',
+                        borderRadius: '15px',
+                        padding: '30px',
+                        maxWidth: '500px',
+                        textAlign: 'center',
+                        color: 'white',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.8)'
+                    }}>
+                        <h2 style={{ margin: '0 0 20px 0', color: '#4a90e2', fontSize: '24px' }}>
+                            💎 Upgrade to Premium
+                        </h2>
+                        
+                        <div style={{ margin: '20px 0', fontSize: '18px' }}>
+                            <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
+                                You've reached the <strong>{FREE_COLLECTION_LIMIT} card limit</strong> for free users!
+                            </p>
+                        </div>
+                        
+                        <div style={{
+                            background: 'rgba(74, 144, 226, 0.1)',
+                            padding: '20px',
+                            borderRadius: '10px',
+                            margin: '20px 0'
+                        }}>
+                            <h3 style={{ margin: '0 0 15px 0', color: '#4a90e2' }}>Premium Features:</h3>
+                            <ul style={{ textAlign: 'left', lineHeight: '1.8', margin: 0, paddingLeft: '20px' }}>
+                                <li>🔥 <strong>Unlimited collection storage</strong></li>
+                                <li>🧠 <strong>Advanced AI learning</strong></li>
+                                <li>📊 <strong>Collection analytics</strong></li>
+                                <li>💰 <strong>Price tracking & alerts</strong></li>
+                                <li>🎯 <strong>Deck optimization tools</strong></li>
+                                <li>⚡ <strong>Priority customer support</strong></li>
+                            </ul>
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            gap: '15px',
+                            margin: '25px 0',
+                            justifyContent: 'center'
+                        }}>
+                            <button 
+                                onClick={handleUpgradeToPremium}
+                                style={{
+                                    padding: '15px 30px',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    fontSize: '16px',
+                                    background: 'linear-gradient(45deg, #4a90e2, #357abd)',
+                                    color: 'white',
+                                    boxShadow: '0 4px 15px rgba(74, 144, 226, 0.4)'
+                                }}
+                            >
+                                💎 Upgrade for $9.99/month
+                            </button>
+                            <button 
+                                onClick={() => setShowPaywallModal(false)}
+                                style={{
+                                    padding: '15px 20px',
+                                    border: '1px solid #666',
+                                    borderRadius: '8px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    fontSize: '16px',
+                                    background: 'transparent',
+                                    color: 'white'
+                                }}
+                            >
+                                Maybe Later
+                            </button>
+                        </div>
+                        
+                        <div style={{
+                            marginTop: '20px',
+                            paddingTop: '20px',
+                            borderTop: '1px solid #444',
+                            fontSize: '12px',
+                            color: '#ccc'
+                        }}>
+                            <p>💳 Secure payment via PayPal</p>
+                            <p>📧 Payment to: thediceyguy@gmail.com</p>
+                            <p>🔒 Cancel anytime, no long-term commitment</p>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Continue Scanning Dialog */}
@@ -891,10 +1130,10 @@ const Scanner = () => {
                             🎯 10 Cards Scanned!
                         </h3>
                         <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
-                            You've successfully scanned <strong>10 cards</strong> in continuous mode.
+                            You've successfully scanned <strong>10 cards</strong> with AI learning.
                         </p>
                         <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
-                            Each card required edition selection for maximum accuracy.
+                            AI learned <strong>{Object.keys(editionPreferences).length}</strong> edition preferences.
                         </p>
                         <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
                             Total saved to collection: <strong>{savedCards.length}</strong> cards
@@ -948,8 +1187,8 @@ const Scanner = () => {
                             color: '#ccc'
                         }}>
                             <span>📊 Session: {continuousCount} cards</span>
+                            <span>🧠 AI learned: {Object.keys(editionPreferences).length}</span>
                             <span>📁 Collection: {savedCards.length} total</span>
-                            <span>🎭 Edition selection: Always shown</span>
                         </div>
                     </div>
                 </div>

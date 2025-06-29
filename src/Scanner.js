@@ -183,6 +183,9 @@ const Scanner = () => {
     const [cameraError, setCameraError] = useState(null);
     const [cameraRetryCount, setCameraRetryCount] = useState(0);
     const [cameraInitializationComplete, setCameraInitializationComplete] = useState(false);
+    const [showCameraSelector, setShowCameraSelector] = useState(false);
+    const [availableCameras, setAvailableCameras] = useState([]);
+    const [selectedCameraId, setSelectedCameraId] = useState(null);
     
     // Refs
     const videoRef = useRef(null);
@@ -203,7 +206,7 @@ const Scanner = () => {
         // Initialize camera ONCE
         if (!initializationPromiseRef.current) {
             console.log('🚀 Starting PERSISTENT camera initialization...');
-            initializationPromiseRef.current = setupCamera();
+            initializationPromiseRef.current = enumerateCameras().then(() => setupCamera());
         }
         
         // Update cooldown status periodically
@@ -273,8 +276,40 @@ const Scanner = () => {
         }
     };
 
-    // Camera setup with persistence
-    const setupCamera = async () => {
+    // Camera enumeration
+    const enumerateCameras = async () => {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            console.log('📷 Available cameras:', videoDevices.length);
+            videoDevices.forEach((device, index) => {
+                console.log(`   ${index + 1}. ${device.label || `Camera ${index + 1}`} (${device.deviceId})`);
+            });
+            
+            setAvailableCameras(videoDevices);
+            
+            // Auto-select Logitech C920 if available
+            const logitechCamera = videoDevices.find(device => 
+                device.label.toLowerCase().includes('logitech') || 
+                device.label.toLowerCase().includes('c920')
+            );
+            
+            if (logitechCamera) {
+                setSelectedCameraId(logitechCamera.deviceId);
+                console.log('✅ Auto-selected Logitech C920:', logitechCamera.label);
+            } else if (videoDevices.length > 0) {
+                setSelectedCameraId(videoDevices[0].deviceId);
+                console.log('✅ Auto-selected first camera:', videoDevices[0].label);
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to enumerate cameras:', error);
+        }
+    };
+
+    // Camera setup with device selection
+    const setupCamera = async (deviceId = null) => {
         console.log('🎥 Setting up PERSISTENT camera for MTG Scanner Pro...');
         setCameraStatus('requesting');
         setCameraError(null);
@@ -282,6 +317,11 @@ const Scanner = () => {
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 throw new Error('Camera API not supported in this browser');
+            }
+
+            // Enumerate cameras if not done yet
+            if (availableCameras.length === 0) {
+                await enumerateCameras();
             }
 
             if (cameraStreamRef.current && cameraStreamRef.current.active) {
@@ -299,24 +339,40 @@ const Scanner = () => {
             }
 
             let stream = null;
+            const useDeviceId = deviceId || selectedCameraId;
             
             try {
-                console.log('📷 Attempting to use Logitech C920...');
-                const logitechConstraints = {
-                    video: {
-                        deviceId: { exact: '9b204eef73d1ed44be0ea768bfdb4c98dc4384c6cdc2fdabd82c6e863313382b' },
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        frameRate: { ideal: 30 }
-                    },
-                    audio: false
-                };
+                let constraints;
                 
-                stream = await navigator.mediaDevices.getUserMedia(logitechConstraints);
-                console.log('✅ Successfully using Logitech C920!');
+                if (useDeviceId) {
+                    console.log('📷 Using selected camera:', useDeviceId);
+                    constraints = {
+                        video: {
+                            deviceId: { exact: useDeviceId },
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                            frameRate: { ideal: 30 }
+                        },
+                        audio: false
+                    };
+                } else {
+                    console.log('📷 Using default camera constraints...');
+                    constraints = {
+                        video: {
+                            width: { ideal: 1280, min: 320 },
+                            height: { ideal: 720, min: 240 },
+                            facingMode: { ideal: 'environment' },
+                            frameRate: { ideal: 30 }
+                        },
+                        audio: false
+                    };
+                }
                 
-            } catch (logitechError) {
-                console.log('⚠️ Logitech C920 not available, trying general constraints...');
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log('✅ Camera initialized successfully!');
+                
+            } catch (specificError) {
+                console.log('⚠️ Specific camera failed, trying general constraints...');
                 
                 const generalConstraints = {
                     video: {
@@ -397,6 +453,32 @@ const Scanner = () => {
                 setupCamera();
             }, retryDelay);
         }
+    };
+
+    const handleCameraSwitch = async (newCameraId) => {
+        console.log('🔄 Switching to camera:', newCameraId);
+        
+        // Stop current stream
+        if (cameraStreamRef.current) {
+            cameraStreamRef.current.getTracks().forEach(track => track.stop());
+            cameraStreamRef.current = null;
+        }
+        
+        // Set new camera
+        setSelectedCameraId(newCameraId);
+        setCameraInitializationComplete(false);
+        
+        // Restart with new camera
+        await setupCamera(newCameraId);
+        
+        setShowCameraSelector(false);
+        showCameraMessage('📷 Camera switched successfully!', 'success');
+    };
+
+    const refreshCameraList = async () => {
+        console.log('🔄 Refreshing camera list...');
+        await enumerateCameras();
+        showCameraMessage('📷 Camera list refreshed!', 'success');
     };
 
     const retryCameraSetup = () => {
@@ -1168,35 +1250,22 @@ const Scanner = () => {
                                     </button>
                                 )}
                                 
+                                {/* Camera Selection */}
+                                <button
+                                    className="camera-select-btn"
+                                    onClick={() => setShowCameraSelector(true)}
+                                    title="Select camera device"
+                                    disabled={isScanning}
+                                >
+                                    📷 Camera Settings
+                                </button>
+                                
                                 <button
                                     className="ui-toggle-btn"
                                     onClick={toggleUIVisibility}
                                     title="Toggle card information display"
                                 >
                                     {isUIVisible ? '👁️ Hide Info' : '👁️ Show Info'}
-                                </button>
-
-                                {/* 🔥 NEW: Reset Cooldowns Button */}
-                                <button
-                                    className="debug-btn"
-                                    onClick={() => {
-                                        cooldownSystemRef.current.resetCooldowns();
-                                        setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
-                                        console.log('🔄 Cooldowns manually reset');
-                                        showCameraMessage('🔄 Cooldowns reset!', 'success');
-                                    }}
-                                    title="Reset all cooldowns"
-                                    style={{
-                                        background: '#28a745',
-                                        color: 'white',
-                                        border: 'none',
-                                        padding: '8px 16px',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '12px'
-                                    }}
-                                >
-                                    🔄 Reset Cooldowns
                                 </button>
                             </div>
                         </div>
@@ -1478,6 +1547,151 @@ const Scanner = () => {
                             <span>🔥 Smart scans: {continuousCount}</span>
                             <span>🧠 AI learned: {Object.keys(editionPreferences).length}</span>
                             <span>📁 Collection: {savedCards.length} total</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Camera Selector Modal */}
+            {showCameraSelector && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(0,0,0,0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10000
+                }}>
+                    <div style={{
+                        background: '#23272a',
+                        border: '2px solid #4a90e2',
+                        borderRadius: '12px',
+                        padding: '24px',
+                        maxWidth: '500px',
+                        width: '90%',
+                        textAlign: 'center',
+                        color: 'white',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                    }}>
+                        <h3 style={{ margin: '0 0 20px 0', color: '#4a90e2', fontSize: '20px' }}>
+                            📷 Camera Settings
+                        </h3>
+                        
+                        <div style={{ marginBottom: '20px', textAlign: 'left' }}>
+                            <p style={{ margin: '0 0 15px 0', fontSize: '14px', color: '#ccc' }}>
+                                Select your preferred camera for MTG card scanning:
+                            </p>
+                            
+                            {availableCameras.length === 0 ? (
+                                <div style={{
+                                    padding: '20px',
+                                    background: 'rgba(220, 53, 69, 0.1)',
+                                    border: '1px solid #dc3545',
+                                    borderRadius: '8px',
+                                    textAlign: 'center'
+                                }}>
+                                    <p style={{ margin: '0 0 10px 0', color: '#dc3545' }}>
+                                        ❌ No cameras detected
+                                    </p>
+                                    <button
+                                        onClick={refreshCameraList}
+                                        style={{
+                                            padding: '8px 16px',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            background: '#4a90e2',
+                                            color: 'white',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        🔄 Refresh Camera List
+                                    </button>
+                                </div>
+                            ) : (
+                                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                    {availableCameras.map((camera, index) => (
+                                        <div
+                                            key={camera.deviceId}
+                                            onClick={() => handleCameraSwitch(camera.deviceId)}
+                                            style={{
+                                                padding: '12px',
+                                                margin: '8px 0',
+                                                background: selectedCameraId === camera.deviceId ? 
+                                                    'rgba(74, 144, 226, 0.3)' : 'rgba(255,255,255,0.1)',
+                                                border: selectedCameraId === camera.deviceId ? 
+                                                    '2px solid #4a90e2' : '1px solid #666',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <div>
+                                                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                                                        📷 {camera.label || `Camera ${index + 1}`}
+                                                    </div>
+                                                    <div style={{ fontSize: '12px', color: '#ccc' }}>
+                                                        {camera.deviceId.substring(0, 20)}...
+                                                    </div>
+                                                </div>
+                                                {selectedCameraId === camera.deviceId && (
+                                                    <div style={{ color: '#4a90e2', fontWeight: 'bold' }}>
+                                                        ✅ Active
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            gap: '12px',
+                            justifyContent: 'center',
+                            paddingTop: '20px',
+                            borderTop: '1px solid #444'
+                        }}>
+                            <button
+                                onClick={refreshCameraList}
+                                style={{
+                                    padding: '10px 20px',
+                                    border: '1px solid #666',
+                                    borderRadius: '6px',
+                                    background: 'transparent',
+                                    color: 'white',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                🔄 Refresh
+                            </button>
+                            <button
+                                onClick={() => setShowCameraSelector(false)}
+                                style={{
+                                    padding: '10px 20px',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    background: '#4a90e2',
+                                    color: 'white',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                ✅ Close
+                            </button>
+                        </div>
+                        
+                        <div style={{
+                            marginTop: '15px',
+                            fontSize: '12px',
+                            color: '#999',
+                            textAlign: 'center'
+                        }}>
+                            💡 Tip: Higher resolution cameras (1080p+) work best for card recognition
                         </div>
                     </div>
                 </div>

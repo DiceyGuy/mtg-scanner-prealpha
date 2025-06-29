@@ -1,9 +1,9 @@
-﻿// MTG-Focused GeminiVisionService.js - WITH SCRYFALL INTEGRATION
-import Tesseract from 'tesseract.js';
+// MTG-Focused GeminiVisionService.js - WITH SCRYFALL INTEGRATION
+// import Tesseract from 'tesseract.js'; // Using Gemini AI instead
 
 class GeminiVisionService {
     constructor() {
-        console.log('🚀 MTG CARD SCANNER - GEMINI + SCRYFALL INTEGRATION!');
+        console.log('?? MTG CARD SCANNER - GEMINI + SCRYFALL INTEGRATION!');
         this.canvas = null;
         this.ctx = null;
         this.debugMode = true;
@@ -19,21 +19,21 @@ class GeminiVisionService {
         this.scryfallLoaded = false;
         this.loadingScryfallData = false;
         
-        console.log('🔑 Gemini Vision API initialized successfully');
-        console.log('🃏 MTG-focused scanner with Scryfall database integration');
-        console.log('🎯 Loading Scryfall MTG database...');
+        console.log('?? Gemini Vision API initialized successfully');
+        console.log('?? MTG-focused scanner with Scryfall database integration');
+        console.log('?? Loading Scryfall MTG database...');
         
         // Start loading Scryfall data
         this.initializeScryfallData();
         
-        this.log('📊 MTG Scanner initialized - preparing Scryfall database');
+        this.log('?? MTG Scanner initialized - preparing Scryfall database');
     }
 
     async initializeScryfallData() {
         if (this.loadingScryfallData || this.scryfallLoaded) return;
         
         this.loadingScryfallData = true;
-        console.log('📥 Loading Scryfall MTG card database...');
+        console.log('?? Loading Scryfall MTG card database...');
         
         try {
             // Get bulk data info from Scryfall
@@ -47,8 +47,8 @@ class GeminiVisionService {
                 throw new Error('Oracle cards bulk data not found');
             }
             
-            console.log('📥 Downloading Scryfall Oracle Cards database...');
-            console.log('📊 Database info:', {
+            console.log('?? Downloading Scryfall Oracle Cards database...');
+            console.log('?? Database info:', {
                 size: Math.round(oracleCards.size / 1024 / 1024) + ' MB',
                 updated: oracleCards.updated_at
             });
@@ -80,13 +80,13 @@ class GeminiVisionService {
             }
             
             this.scryfallLoaded = true;
-            console.log('✅ Scryfall database loaded successfully!');
-            console.log('📊 Total MTG cards in database:', processedCards);
-            console.log('🎯 MTG Scanner ready for professional card identification!');
+            console.log('? Scryfall database loaded successfully!');
+            console.log('?? Total MTG cards in database:', processedCards);
+            console.log('?? MTG Scanner ready for professional card identification!');
             
         } catch (error) {
-            console.error('❌ Failed to load Scryfall database:', error);
-            console.log('⚠️ Falling back to basic MTG card detection');
+            console.error('? Failed to load Scryfall database:', error);
+            console.log('?? Falling back to basic MTG card detection');
             this.scryfallLoaded = false;
         } finally {
             this.loadingScryfallData = false;
@@ -95,34 +95,34 @@ class GeminiVisionService {
 
     log(message, data = null) {
         if (this.debugMode) {
-            console.log(`🎯 ${message}`, data || '');
+            console.log(`?? ${message}`, data || '');
         }
     }
 
     // MAIN PROCESSING METHOD - MTG FOCUSED
     async processVideoFrame(videoElement) {
-        this.log('🎥 Processing frame for MTG CARD IDENTIFICATION...');
+        this.log('?? Processing frame for MTG CARD IDENTIFICATION...');
         const startTime = performance.now();
         
         try {
             // Step 1: Capture frame
             const frameData = await this.captureHighQualityFrame(videoElement);
-            this.log('📷 Frame captured', `${frameData.width}x${frameData.height}`);
+            this.log('?? Frame captured', `${frameData.width}x${frameData.height}`);
             
             // Step 2: MTG-focused Gemini Vision analysis
             const geminiResult = await this.callGeminiVisionForMTG(frameData);
-            this.log('🧠 Gemini MTG analysis result', geminiResult);
+            this.log('?? Gemini MTG analysis result', geminiResult);
             
             // Step 3: Enhance with Scryfall database
             const enhancedResult = await this.enhanceWithScryfallData(geminiResult, frameData);
-            this.log('⚡ Scryfall-enhanced result', enhancedResult);
+            this.log('? Scryfall-enhanced result', enhancedResult);
             
             const processingTime = Math.round(performance.now() - startTime);
             
             return this.formatMTGScannerResult(enhancedResult, processingTime);
             
         } catch (error) {
-            this.log('❌ MTG scanning error, using fallback', error.message);
+            this.log('? MTG scanning error, using fallback', error.message);
             const processingTime = Math.round(performance.now() - startTime);
             return await this.mtgFallback(videoElement, processingTime);
         }
@@ -130,13 +130,13 @@ class GeminiVisionService {
 
     // MTG-OPTIMIZED GEMINI VISION CALL
     async callGeminiVisionForMTG(frameData) {
-        this.log('🌐 Calling Gemini Vision for MTG CARD IDENTIFICATION...');
+        this.log('?? Calling Gemini Vision for MTG CARD IDENTIFICATION...');
         
         // Rate limiting
         const now = Date.now();
         if (now - this.lastGeminiCall < this.geminiRateLimit) {
             const waitTime = this.geminiRateLimit - (now - this.lastGeminiCall);
-            this.log(`⏳ Rate limiting: waiting ${waitTime}ms`);
+            this.log(`? Rate limiting: waiting ${waitTime}ms`);
             throw new Error(`Rate limited - wait ${waitTime}ms between calls`);
         }
         this.lastGeminiCall = now;
@@ -144,7 +144,7 @@ class GeminiVisionService {
         // Convert frame to base64
         const imageBase64 = this.frameToBase64(frameData);
         const base64Data = imageBase64.split(',')[1];
-        this.log('📷 Image ready for MTG analysis, size:', base64Data.length);
+        this.log('?? Image ready for MTG analysis, size:', base64Data.length);
         
         // MAGIC: THE GATHERING SPECIFIC PROMPT
         const mtgPrompt = `You are a Magic: The Gathering card identification expert. Analyze this image ONLY for Magic: The Gathering cards.
@@ -199,7 +199,7 @@ Only analyze Magic: The Gathering cards. Ignore all other objects.`;
                 body: JSON.stringify(requestBody)
             });
 
-            this.log('📥 Response received:', {
+            this.log('?? Response received:', {
                 status: response.status,
                 statusText: response.statusText,
                 ok: response.ok
@@ -207,7 +207,7 @@ Only analyze Magic: The Gathering cards. Ignore all other objects.`;
 
             if (!response.ok) {
                 const errorText = await response.text();
-                this.log('❌ Gemini error response:', errorText);
+                this.log('? Gemini error response:', errorText);
                 throw new Error(`Gemini error: ${response.status} - ${errorText}`);
             }
 
@@ -215,19 +215,19 @@ Only analyze Magic: The Gathering cards. Ignore all other objects.`;
             
             // CRITICAL: LOG THE RAW RESPONSE TO DEBUG JSON PARSING
             const responseText = data.candidates[0].content.parts[0].text;
-            console.log('🔍 RAW GEMINI RESPONSE (for debugging):');
+            console.log('?? RAW GEMINI RESPONSE (for debugging):');
             console.log('---START RESPONSE---');
             console.log(responseText);
             console.log('---END RESPONSE---');
             
             // Parse MTG-specific response format
             const mtgAnalysis = this.parseMTGResponse(responseText);
-            this.log('✅ MTG parsing successful:', mtgAnalysis);
+            this.log('? MTG parsing successful:', mtgAnalysis);
             
             return mtgAnalysis;
 
         } catch (error) {
-            this.log('❌ Gemini MTG Vision call failed:', error.message);
+            this.log('? Gemini MTG Vision call failed:', error.message);
             throw error;
         }
     }
@@ -281,10 +281,10 @@ Only analyze Magic: The Gathering cards. Ignore all other objects.`;
 
     // ENHANCE WITH SCRYFALL DATABASE
     async enhanceWithScryfallData(geminiResult, frameData) {
-        this.log('⚡ Enhancing with Scryfall MTG database...');
+        this.log('? Enhancing with Scryfall MTG database...');
         
         if (!this.scryfallLoaded) {
-            this.log('⚠️ Scryfall database not loaded yet, using basic enhancement');
+            this.log('?? Scryfall database not loaded yet, using basic enhancement');
             return geminiResult;
         }
         
@@ -310,7 +310,7 @@ Only analyze Magic: The Gathering cards. Ignore all other objects.`;
                     verificationSource: 'scryfall_exact_match',
                     isVerified: true
                 };
-                this.log('✅ EXACT MATCH found in Scryfall database:', scryfallCard.name);
+                this.log('? EXACT MATCH found in Scryfall database:', scryfallCard.name);
             } else {
                 // Fuzzy matching in Scryfall database
                 const fuzzyMatch = this.scryfallFuzzyMatch(cardKey);
@@ -327,7 +327,7 @@ Only analyze Magic: The Gathering cards. Ignore all other objects.`;
                         matchScore: fuzzyMatch.score,
                         originalDetection: geminiResult.cardName
                     };
-                    this.log('🎯 FUZZY MATCH found in Scryfall:', fuzzyMatch.card.name);
+                    this.log('?? FUZZY MATCH found in Scryfall:', fuzzyMatch.card.name);
                 }
             }
         }
@@ -466,7 +466,7 @@ Only analyze Magic: The Gathering cards. Ignore all other objects.`;
 
     // MTG FALLBACK
     async mtgFallback(videoElement, processingTime) {
-        this.log('🔄 MTG Vision unavailable, using basic fallback...');
+        this.log('?? MTG Vision unavailable, using basic fallback...');
         
         return {
             hasCard: false,

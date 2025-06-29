@@ -1,6 +1,6 @@
 // Scanner.js - Updated with Card Display UI Integration
 import React, { useState, useRef, useEffect } from 'react';
-import GeminiVisionService from './GeminiVisionService';
+import ClaudeVisionService from './ClaudeVisionService';
 import CardDisplayUI from './CardDisplayUI';
 import DeckManager from './DeckManager';
 import MTGKnowledgeBase from './MTGKnowledgeBase';
@@ -38,7 +38,7 @@ const Scanner = () => {
         console.log('🔧 Initializing MTG Scanner services...');
         
         try {
-            visionServiceRef.current = new GeminiVisionService();
+            visionServiceRef.current = new ClaudeVisionService();
             console.log('✅ Services initialized successfully');
         } catch (error) {
             console.error('❌ Service initialization failed:', error);

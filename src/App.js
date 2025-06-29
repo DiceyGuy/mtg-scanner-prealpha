@@ -1,6 +1,6 @@
 // src/App.js - FIXED VERSION (NO PREMIUM SCANNER YET)
 import React, { useState } from 'react';
-import Scanner from '../Scanner';  // Your working scanner
+import Scanner from './Scanner';   // ✅ Looking in src/
 
 function App() {
   const [currentView, setCurrentView] = useState('home');

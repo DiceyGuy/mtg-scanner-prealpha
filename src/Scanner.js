@@ -1,11 +1,11 @@
 // Scanner.js - Professional MTG Tool with Smart Scanning (FIXED VERSION)
 import React, { useState, useRef, useEffect } from 'react';
-import ClaudeVisionService from './ClaudeVisionService'; // ✅ Correct path
-import CardDisplayUI from './CardDisplayUI'; // ✅ Fixed path - removed ./src/
-import DeckManager from './DeckManager'; // ✅ Fixed path - removed ./src/
-import MTGKnowledgeBase from './MTGKnowledgeBase'; // ✅ Fixed path - removed ./src/
-import EditionSelector from './EditionSelector'; // ✅ Fixed path - removed ./src/
-import './CardDisplay.css'; // ✅ Fixed path - removed ./src/
+import ClaudeVisionService from './ClaudeVisionService';
+import CardDisplayUI from './CardDisplayUI';
+import DeckManager from './DeckManager';
+import MTGKnowledgeBase from './MTGKnowledgeBase';
+import EditionSelector from './EditionSelector';
+import './CardDisplay.css';
 
 const Scanner = () => {
     // Core scanner state
@@ -13,25 +13,26 @@ const Scanner = () => {
     const [scanResult, setScanResult] = useState(null);
     const [cameraStatus, setCameraStatus] = useState('initializing');
     const [currentCard, setCurrentCard] = useState(null);
-    const [scanMode, setScanMode] = useState('continuous'); // continuous or single
+    const [scanMode, setScanMode] = useState('continuous');
     
-    // 🚀 NEW: Smart scanning state
+    // Smart scanning state
     const [continuousCount, setContinuousCount] = useState(0);
     const [showContinueDialog, setShowContinueDialog] = useState(false);
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
     
     // UI state
-    const [activeTab, setActiveTab] = useState('scanner'); // scanner, deck, knowledge
+    const [activeTab, setActiveTab] = useState('scanner');
     const [scanHistory, setScanHistory] = useState([]);
     const [isUIVisible, setIsUIVisible] = useState(true);
     const [savedCards, setSavedCards] = useState([]);
     
-    // Edition selection state
+    // Edition selection state - FIXED: Always show when multiple editions
     const [showEditionSelector, setShowEditionSelector] = useState(false);
     const [availableEditions, setAvailableEditions] = useState([]);
     const [pendingCardData, setPendingCardData] = useState(null);
+    const [pendingScanMode, setPendingScanMode] = useState(null); // Track which mode triggered the selector
     
-    // Camera initialization state
+    // Camera state
     const [cameraError, setCameraError] = useState(null);
     const [cameraRetryCount, setCameraRetryCount] = useState(0);
     const [permissionRequested, setPermissionRequested] = useState(false);
@@ -42,19 +43,16 @@ const Scanner = () => {
     const visionServiceRef = useRef(null);
     const cameraStreamRef = useRef(null);
 
-    // Initialize services and camera automatically
+    // Initialize services and camera
     useEffect(() => {
         initializeServices();
         
-        // Auto-initialize camera when component mounts
         const initCamera = async () => {
             console.log('🚀 MTG Scanner: Auto-initializing camera...');
             await setupCamera();
         };
         
-        // Start camera initialization after a brief delay
         const cameraTimer = setTimeout(initCamera, 1000);
-        
         loadSavedCards();
         
         return () => {
@@ -63,7 +61,6 @@ const Scanner = () => {
         };
     }, []);
 
-    // Auto-initialize camera when scanner tab becomes active
     useEffect(() => {
         if (activeTab === 'scanner' && cameraStatus !== 'ready' && !permissionRequested) {
             console.log('🎯 Scanner tab active, ensuring camera is ready...');
@@ -75,7 +72,6 @@ const Scanner = () => {
         console.log('🔧 Initializing MTG Scanner Pro...');
         
         try {
-            // BRUKER GEMINI API SOM FUNGERER PERFEKT
             visionServiceRef.current = new ClaudeVisionService();
             console.log('✅ Gemini Vision Service initialized successfully');
         } catch (error) {
@@ -95,7 +91,7 @@ const Scanner = () => {
         }
     };
 
-    // 🔧 FIXED: Enhanced camera setup with relaxed constraints
+    // FIXED: Enhanced camera setup with Logitech C920 prioritization
     const setupCamera = async () => {
         console.log('🎥 Setting up camera for MTG Scanner Pro...');
         setCameraStatus('requesting');
@@ -103,23 +99,46 @@ const Scanner = () => {
         setPermissionRequested(true);
         
         try {
-            // Check if camera API is available
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 throw new Error('Camera API not supported in this browser');
             }
 
-            // 🔧 FIXED: Use relaxed constraints to avoid OverconstrainedError
-            const constraints = {
-                video: {
-                    width: { ideal: 1280, min: 320 }, // ✅ Added min value
-                    height: { ideal: 720, min: 240 }, // ✅ Added min value
-                    facingMode: { ideal: 'environment' }, // ✅ Made ideal instead of exact
-                    frameRate: { ideal: 30 } // ✅ Removed min constraint
-                }
-            };
+            // First, try to get the Logitech C920 specifically
+            let stream = null;
             
-            console.log('📷 Requesting camera with relaxed constraints...');
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            try {
+                console.log('📷 Attempting to use Logitech C920...');
+                const logitechConstraints = {
+                    video: {
+                        deviceId: { exact: '9b204eef73d1ed44be0ea768bfdb4c98dc4384c6cdc2fdabd82c6e863313382b' },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        frameRate: { ideal: 30 }
+                    },
+                    audio: false
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(logitechConstraints);
+                console.log('✅ Successfully using Logitech C920!');
+                
+            } catch (logitechError) {
+                console.log('⚠️ Logitech C920 not available, trying general constraints...');
+                
+                // Fallback to general constraints
+                const generalConstraints = {
+                    video: {
+                        width: { ideal: 1280, min: 320 },
+                        height: { ideal: 720, min: 240 },
+                        facingMode: { ideal: 'environment' },
+                        frameRate: { ideal: 30 }
+                    },
+                    audio: false
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(generalConstraints);
+                console.log('✅ Using fallback camera settings');
+            }
+            
             cameraStreamRef.current = stream;
             
             if (videoRef.current) {
@@ -130,59 +149,17 @@ const Scanner = () => {
                     setCameraError(null);
                     setCameraRetryCount(0);
                     console.log('✅ Camera ready:', `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
-                    
-                    // Show success message
                     showCameraMessage('✅ Camera ready for scanning!', 'success');
                 };
             }
             
         } catch (error) {
             console.error('❌ Camera setup failed:', error);
-            
-            // 🔧 FIXED: Try fallback constraints immediately for OverconstrainedError
-            if (error.name === 'OverconstrainedError') {
-                console.log('🔄 Trying fallback camera settings...');
-                setTimeout(() => setupCameraFallback(), 500);
-            } else {
-                setCameraStatus('error');
-                handleCameraError(error);
-            }
-        }
-    };
-
-    // 🔧 FIXED: Fallback camera setup with minimal constraints
-    const setupCameraFallback = async () => {
-        try {
-            console.log('🔄 Trying minimal camera constraints...');
-            
-            // Minimal constraints that work on almost any device
-            const minimalConstraints = {
-                video: true // Just request any video
-            };
-            
-            const stream = await navigator.mediaDevices.getUserMedia(minimalConstraints);
-            cameraStreamRef.current = stream;
-            
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                videoRef.current.onloadedmetadata = () => {
-                    videoRef.current.play();
-                    setCameraStatus('ready');
-                    setCameraError(null);
-                    setCameraRetryCount(0);
-                    console.log('✅ Camera ready with fallback settings');
-                    showCameraMessage('✅ Camera ready (basic settings)', 'success');
-                };
-            }
-            
-        } catch (fallbackError) {
-            console.error('❌ Fallback camera settings also failed:', fallbackError);
             setCameraStatus('error');
-            handleCameraError(fallbackError);
+            handleCameraError(error);
         }
     };
 
-    // Handle different camera errors with user-friendly messages and retry logic
     const handleCameraError = (error) => {
         let errorMessage = '';
         let errorAction = '';
@@ -217,9 +194,8 @@ const Scanner = () => {
 
         setCameraError({ message: errorMessage, action: errorAction, canRetry });
         
-        // Auto-retry logic for some errors
         if (canRetry && cameraRetryCount < 2 && error.name !== 'NotAllowedError') {
-            const retryDelay = (cameraRetryCount + 1) * 2000; // 2s, 4s
+            const retryDelay = (cameraRetryCount + 1) * 2000;
             console.log(`🔄 Auto-retrying camera setup in ${retryDelay/1000}s (attempt ${cameraRetryCount + 1}/2)`);
             
             setTimeout(() => {
@@ -229,7 +205,6 @@ const Scanner = () => {
         }
     };
 
-    // Manual camera retry
     const retryCameraSetup = () => {
         console.log('🔄 Manual camera retry requested');
         setCameraRetryCount(0);
@@ -237,7 +212,6 @@ const Scanner = () => {
         setupCamera();
     };
 
-    // Show temporary camera messages
     const showCameraMessage = (message, type = 'info') => {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'camera-toast-message';
@@ -277,7 +251,6 @@ const Scanner = () => {
         console.log(`▶️ Starting MTG Scanner Pro - ${scanMode} mode...`);
         setIsScanning(true);
         
-        // 🚀 NEW: Reset counter for continuous mode
         if (scanMode === 'continuous') {
             setContinuousCount(0);
             console.log('🔄 Continuous mode: Reset counter to 0');
@@ -295,7 +268,7 @@ const Scanner = () => {
                         stopScanning();
                     }
                     
-                    // ALWAYS check for multiple editions, even if ClaudeVisionService enhanced the card
+                    // Always check for multiple editions
                     await handleCardDetection(result);
                     
                 } else if (result && !result.hasCard) {
@@ -307,22 +280,20 @@ const Scanner = () => {
                 console.error('❌ Scanning error:', error);
                 setScanResult({ hasCard: false, message: 'Scanner error - please try again' });
             }
-        }, scanMode === 'single' ? 500 : 1000); // Faster scanning for single mode
+        }, scanMode === 'single' ? 500 : 1000);
     };
 
-    // 🧠 ENHANCED: Smart card detection with auto-save logic
+    // FIXED: Always show edition selector when multiple editions exist
     const handleCardDetection = async (detectedCard) => {
         try {
             console.log('🎭 Checking for multiple editions of:', detectedCard.cardName);
             
-            // Create a clean search query
             const cardName = detectedCard.cardName.trim();
             const searchQuery = `!"${cardName}"`;
             const encodedQuery = encodeURIComponent(searchQuery);
             
             console.log('🔍 Scryfall search query:', searchQuery);
             
-            // Search for all editions of this card in Scryfall
             const editionsResponse = await fetch(
                 `https://api.scryfall.com/cards/search?q=${encodedQuery}&unique=prints&order=released&dir=desc`
             );
@@ -333,63 +304,38 @@ const Scanner = () => {
                 
                 console.log(`📊 Scryfall returned ${editions.length} total results`);
                 
-                // Filter to exact name matches only (case insensitive, trimmed)
+                // Filter to exact name matches only
                 const exactMatches = editions.filter(card => {
                     const cardNameNormalized = card.name.toLowerCase().trim();
                     const searchNameNormalized = cardName.toLowerCase().trim();
-                    const match = cardNameNormalized === searchNameNormalized;
-                    
-                    if (!match) {
-                        console.log(`❌ Filtered out: "${card.name}" (${card.set_name})`);
-                    }
-                    return match;
+                    return cardNameNormalized === searchNameNormalized;
                 });
                 
                 console.log(`🎯 Found ${exactMatches.length} exact name matches for "${cardName}"`);
                 
-                // Log all exact matches for debugging
                 exactMatches.forEach((card, index) => {
                     console.log(`   ${index + 1}. ${card.set_name} (${card.set.toUpperCase()}) - ${card.released_at}`);
                 });
                 
                 if (exactMatches.length > 1) {
-                    // 🎯 SMART BEHAVIOR: Different for single vs continuous mode
-                    if (scanMode === 'single') {
-                        // SINGLE MODE: Stop and show edition selector for precise control
-                        console.log('⏹️ SINGLE MODE: Stopping for edition selection');
+                    // FIXED: ALWAYS show edition selector for multiple editions, regardless of scan mode
+                    console.log(`🎭 Multiple editions found - showing edition selector (${scanMode} mode)`);
+                    
+                    // Stop scanning to show edition selector
+                    if (isScanning) {
                         stopScanning();
-                        
-                        setPendingCardData(detectedCard);
-                        setAvailableEditions(exactMatches);
-                        setShowEditionSelector(true);
-                        
-                        setScanResult(null);
-                        setCurrentCard(null);
-                        return; // Wait for user selection
-                        
-                    } else if (scanMode === 'continuous') {
-                        // 🔄 CONTINUOUS MODE: Auto-pick best edition and continue
-                        console.log('🔄 CONTINUOUS MODE: Auto-selecting best edition');
-                        
-                        const bestEdition = selectBestEdition(exactMatches);
-                        console.log(`✅ Auto-selected: ${bestEdition.set_name} (${bestEdition.set.toUpperCase()})`);
-                        
-                        const enhancedCard = enhanceCardWithScryfall(detectedCard, bestEdition);
-                        displayCard(enhancedCard);
-                        
-                        // 💾 AUTO-SAVE to collection in continuous mode
-                        if (autoSaveEnabled) {
-                            saveCardToCollection(enhancedCard);
-                            console.log(`💾 AUTO-SAVED: ${enhancedCard.cardName} to collection`);
-                        }
-                        
-                        // Increment continuous scan counter and check limit
-                        handleContinuousCounterAndLimit();
-                        
-                        // Show brief toast about auto-selection
-                        showAutoSelectionToast(bestEdition.set_name);
-                        return;
                     }
+                    
+                    // Store the pending card data and scan mode
+                    setPendingCardData(detectedCard);
+                    setPendingScanMode(scanMode); // Remember which mode we were in
+                    setAvailableEditions(exactMatches);
+                    setShowEditionSelector(true);
+                    
+                    // Clear current display while waiting for selection
+                    setScanResult(null);
+                    setCurrentCard(null);
+                    return;
                     
                 } else if (exactMatches.length === 1) {
                     // Single edition - use it directly
@@ -409,7 +355,6 @@ const Scanner = () => {
                     console.log('⚠️ No exact Scryfall matches found, using original detection');
                     displayCard(detectedCard);
                     
-                    // Auto-save in continuous mode even without Scryfall data
                     if (scanMode === 'continuous' && autoSaveEnabled) {
                         saveCardToCollection(detectedCard);
                         console.log(`💾 AUTO-SAVED: ${detectedCard.cardName} to collection (no Scryfall match)`);
@@ -427,30 +372,6 @@ const Scanner = () => {
         }
     };
 
-    // 🚀 NEW: Smart edition selection for continuous mode
-    const selectBestEdition = (editions) => {
-        // Priority logic for auto-selecting best edition
-        
-        // 1. Prefer Standard-legal cards (recent sets)
-        const standardSets = ['mkm', 'otj', 'blb', 'dsk', 'fdn']; // Recent standard sets
-        const standardCard = editions.find(card => standardSets.includes(card.set));
-        if (standardCard) {
-            console.log('🎯 Auto-selected Standard-legal edition:', standardCard.set_name);
-            return standardCard;
-        }
-        
-        // 2. Prefer most recent printing (first in the ordered results)
-        const mostRecent = editions[0];
-        if (mostRecent) {
-            console.log('🆕 Auto-selected most recent edition:', mostRecent.set_name);
-            return mostRecent;
-        }
-        
-        // 3. Fallback to any available edition
-        return editions[0];
-    };
-
-    // 🚀 NEW: Handle continuous counter and 10-card limit
     const handleContinuousCounterAndLimit = () => {
         const newCount = continuousCount + 1;
         setContinuousCount(newCount);
@@ -462,60 +383,22 @@ const Scanner = () => {
         }
     };
 
-    // 🚀 NEW: Show brief toast about auto-selection
-    const showAutoSelectionToast = (setName) => {
-        const toast = document.createElement('div');
-        toast.className = 'auto-selection-toast';
-        toast.innerHTML = `📦 Auto-selected: ${setName}`;
-        toast.style.cssText = `
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            background: #28a745;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 4px;
-            z-index: 9999;
-            font-size: 14px;
-            font-weight: 500;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            animation: slideIn 0.3s ease-out;
-        `;
-
-        document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            if (toast.parentNode) {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(100%)';
-                setTimeout(() => {
-                    if (toast.parentNode) {
-                        toast.parentNode.removeChild(toast);
-                    }
-                }, 300);
-            }
-        }, 2000);
-    };
-
-    // 🚀 NEW: Handle 10-card limit dialog
     const handleContinueScanning = () => {
         console.log('🔄 User chose to continue scanning...');
         setShowContinueDialog(false);
-        setContinuousCount(0); // Reset counter
-        startScanning(); // Resume scanning
+        setContinuousCount(0);
+        startScanning();
     };
 
     const handleStopScanning = () => {
         console.log('⏹️ User chose to stop scanning at 10-card limit');
         setShowContinueDialog(false);
-        setContinuousCount(0); // Reset counter
-        // Already stopped, just close dialog
+        setContinuousCount(0);
     };
 
     const enhanceCardWithScryfall = (originalCard, scryfallCard) => {
         return {
             ...originalCard,
-            // Enhanced with Scryfall data
             cardType: scryfallCard.type_line,
             manaCost: scryfallCard.mana_cost,
             setInfo: scryfallCard.set_name,
@@ -534,7 +417,6 @@ const Scanner = () => {
         setCurrentCard(card);
         setScanResult(card);
         
-        // Add to scan history (avoid duplicates)
         setScanHistory(prev => {
             const isDuplicate = prev.some(historyCard => 
                 historyCard.cardName === card.cardName && 
@@ -542,33 +424,73 @@ const Scanner = () => {
             );
             
             if (!isDuplicate) {
-                return [card, ...prev.slice(0, 19)]; // Keep last 20 cards
+                return [card, ...prev.slice(0, 19)];
             }
             return prev;
         });
     };
 
+    // FIXED: Handle edition selection and resume appropriate behavior
     const handleEditionSelected = (selectedEdition) => {
         if (pendingCardData && selectedEdition) {
             const enhancedCard = enhanceCardWithScryfall(pendingCardData, selectedEdition);
             displayCard(enhancedCard);
+            
+            console.log(`✅ User selected: ${selectedEdition.set_name} (${selectedEdition.set.toUpperCase()})`);
+            
+            // Handle post-selection behavior based on original scan mode
+            if (pendingScanMode === 'continuous' && autoSaveEnabled) {
+                saveCardToCollection(enhancedCard);
+                console.log(`💾 AUTO-SAVED: ${enhancedCard.cardName} to collection`);
+                handleContinuousCounterAndLimit();
+                
+                // Resume continuous scanning if we haven't hit the limit
+                if (continuousCount < 9) { // Will be incremented to 10 in handleContinuousCounterAndLimit
+                    console.log('🔄 Resuming continuous scanning after edition selection...');
+                    setTimeout(() => {
+                        if (!isScanning) { // Only restart if not already scanning
+                            startScanning();
+                        }
+                    }, 1000); // Brief delay to show the selected card
+                }
+            }
+            // For single mode, just display the card (scanning already stopped)
         }
         
-        // Close edition selector
+        // Close edition selector and reset state
         setShowEditionSelector(false);
         setAvailableEditions([]);
         setPendingCardData(null);
+        setPendingScanMode(null);
     };
 
     const handleEditionCancelled = () => {
         // Use original detection without Scryfall enhancement
         if (pendingCardData) {
             displayCard(pendingCardData);
+            
+            // Handle post-cancellation behavior
+            if (pendingScanMode === 'continuous' && autoSaveEnabled) {
+                saveCardToCollection(pendingCardData);
+                console.log(`💾 AUTO-SAVED: ${pendingCardData.cardName} to collection (cancelled edition selection)`);
+                handleContinuousCounterAndLimit();
+                
+                // Resume continuous scanning if appropriate
+                if (continuousCount < 9) {
+                    console.log('🔄 Resuming continuous scanning after cancellation...');
+                    setTimeout(() => {
+                        if (!isScanning) {
+                            startScanning();
+                        }
+                    }, 1000);
+                }
+            }
         }
         
         setShowEditionSelector(false);
         setAvailableEditions([]);
         setPendingCardData(null);
+        setPendingScanMode(null);
     };
 
     const stopScanning = () => {
@@ -584,7 +506,6 @@ const Scanner = () => {
     const cleanup = () => {
         stopScanning();
         
-        // Stop camera stream
         if (cameraStreamRef.current) {
             cameraStreamRef.current.getTracks().forEach(track => track.stop());
             cameraStreamRef.current = null;
@@ -596,7 +517,6 @@ const Scanner = () => {
         }
     };
 
-    // Card management actions
     const saveCardToCollection = (card) => {
         try {
             const cardWithId = {
@@ -609,12 +529,10 @@ const Scanner = () => {
             const updatedCards = [cardWithId, ...savedCards];
             setSavedCards(updatedCards);
             
-            // Save to localStorage
             localStorage.setItem('mtg_saved_cards', JSON.stringify(updatedCards));
             
             console.log('💾 Card saved to collection:', card.cardName);
             
-            // Show success feedback only for manual saves (single mode)
             if (scanMode === 'single') {
                 setScanResult(prev => ({
                     ...prev,
@@ -622,7 +540,6 @@ const Scanner = () => {
                     message: `✅ ${card.cardName} saved to collection!`
                 }));
                 
-                // Clear success message after 3 seconds
                 setTimeout(() => {
                     setScanResult(prev => ({
                         ...prev,
@@ -696,7 +613,7 @@ const Scanner = () => {
                     </div>
                     <div className="app-title">
                         <h1>MTG Scanner Pro</h1>
-                        <span className="app-subtitle">Smart Bulk Scanning + Precise Control</span>
+                        <span className="app-subtitle">Professional Edition Selection + Smart Scanning</span>
                     </div>
                 </div>
                 
@@ -789,8 +706,8 @@ const Scanner = () => {
                                             🔍 Position MTG card in frame
                                             <div className="scan-tech">
                                                 {scanMode === 'continuous' ? 
-                                                    `🔄 Auto-saving to collection (${continuousCount}/10)` : 
-                                                    '📷 Single shot precision mode'
+                                                    `🔄 Edition selector mode (${continuousCount}/10)` : 
+                                                    '📷 Single shot with edition selection'
                                                 }
                                             </div>
                                         </div>
@@ -825,9 +742,11 @@ const Scanner = () => {
                                 <button
                                     className={`scan-btn ${isScanning ? 'scanning' : 'ready'}`}
                                     onClick={isScanning ? stopScanning : startScanning}
-                                    disabled={cameraStatus !== 'ready'}
+                                    disabled={cameraStatus !== 'ready' || showEditionSelector}
                                 >
-                                    {isScanning ? '⏹️ Stop Scanning' : `▶️ Start ${scanMode === 'single' ? 'Single' : 'Continuous'} Scan`}
+                                    {isScanning ? '⏹️ Stop Scanning' : 
+                                     showEditionSelector ? '🎭 Edition Selection Active' :
+                                     `▶️ Start ${scanMode === 'single' ? 'Single' : 'Continuous'} Scan`}
                                 </button>
                                 
                                 {/* Camera Retry Button */}
@@ -853,7 +772,7 @@ const Scanner = () => {
                                 <button
                                     className="debug-btn"
                                     onClick={() => {
-                                        console.log('🧪 Testing smart scanning for Lightning Bolt...');
+                                        console.log('🧪 Testing edition selector for Lightning Bolt...');
                                         handleCardDetection({
                                             cardName: 'Lightning Bolt',
                                             confidence: 95,
@@ -861,9 +780,9 @@ const Scanner = () => {
                                             hasCard: true
                                         });
                                     }}
-                                    title="Test smart scanning"
+                                    title="Test edition selector"
                                 >
-                                    🧪 Test Smart Scan
+                                    🧪 Test Editions
                                 </button>
                             </div>
                         </div>
@@ -930,11 +849,11 @@ const Scanner = () => {
                     </div>
                     <span className="status-item">🧠 Powered by Gemini AI</span>
                     <span className="status-item">📡 Scryfall Database</span>
-                    <span className="status-item">📷 {scanMode} Mode</span>
+                    <span className="status-item">🎭 Edition Selector Mode</span>
                 </div>
             </div>
 
-            {/* Edition Selector Modal */}
+            {/* Edition Selector Modal - ALWAYS SHOWN for multiple editions */}
             {showEditionSelector && (
                 <EditionSelector
                     cardName={pendingCardData?.cardName}
@@ -975,7 +894,10 @@ const Scanner = () => {
                             You've successfully scanned <strong>10 cards</strong> in continuous mode.
                         </p>
                         <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
-                            Auto-saved to your collection: <strong>{savedCards.length}</strong> total cards
+                            Each card required edition selection for maximum accuracy.
+                        </p>
+                        <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
+                            Total saved to collection: <strong>{savedCards.length}</strong> cards
                         </p>
                         
                         <div style={{
@@ -1027,6 +949,7 @@ const Scanner = () => {
                         }}>
                             <span>📊 Session: {continuousCount} cards</span>
                             <span>📁 Collection: {savedCards.length} total</span>
+                            <span>🎭 Edition selection: Always shown</span>
                         </div>
                     </div>
                 </div>

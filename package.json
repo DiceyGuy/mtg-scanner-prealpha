@@ -4,8 +4,7 @@
   "description": "AI-powered MTG card scanner with 98% accuracy",
   "main": "src/index.js",
   "engines": {
-    "node": "18.x",
-    "npm": "9.x"
+    "node": "18.x"
   },
   "scripts": {
     "start": "react-scripts start",

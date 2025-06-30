@@ -1,5 +1,5 @@
 // DeckManager.js - Professional MTG Collection & Deck Builder
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 const DeckManager = ({ savedCards, onRemoveCard, onOpenScryfall, scanHistory }) => {
     const [viewMode, setViewMode] = useState('grid'); // grid, list

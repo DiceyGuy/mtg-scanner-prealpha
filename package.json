@@ -4,5 +4,10 @@
   "description": "MTG Scanner Pro - Live Website",
   "scripts": {
     "build": "mkdir -p dist && cp index.html dist/ && echo 'Build complete'"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-scripts": "^5.0.1"
   }
 }

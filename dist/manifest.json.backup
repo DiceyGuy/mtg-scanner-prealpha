@@ -1,0 +1,25 @@
+{
+  "name": "MTG Scanner Enterprise",
+  "short_name": "MTG Scanner",
+  "description": "Enterprise-grade Magic: The Gathering card scanner with OCR and database integration",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": [
+    "games",
+    "utilities",
+    "productivity"
+  ],
+  "permissions": [
+    "camera",
+    "storage"
+  ],
+  "offline_enabled": true,
+  "cache_mode": "aggressive"
+}

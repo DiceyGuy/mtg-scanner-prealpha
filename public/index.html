@@ -2,125 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="/favicon.ico" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#4a90e2" />
     <meta name="description" content="MTG Scanner Pro - AI-powered Magic: The Gathering card recognition with 98% accuracy" />
-    <link rel="apple-touch-icon" href="/MTG_Scanner_Logo.png" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/MTG_Scanner_Logo.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>MTG Scanner Pro - AI Card Recognition</title>
-    
-    <!-- Preload critical resources -->
-    <link rel="preload" href="/MTG_Scanner_Logo.png" as="image" />
-    
-    <!-- SEO and Social Meta -->
-    <meta property="og:title" content="MTG Scanner Pro - AI Card Recognition" />
-    <meta property="og:description" content="Scan Magic: The Gathering cards with 98% accuracy using AI" />
-    <meta property="og:image" content="/MTG_Scanner_Logo.png" />
-    <meta property="og:url" content="https://mtg-scanner-prealpha.vercel.app" />
-    <meta name="twitter:card" content="summary_large_image" />
-    
-    <style>
-      /* Loading screen styles */
-      .loading-screen {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-        color: white;
-        font-family: 'Segoe UI', sans-serif;
-      }
-      
-      .loading-logo {
-        width: 120px;
-        height: 120px;
-        background: linear-gradient(45deg, #4a90e2, #64b5f6);
-        border-radius: 20px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 24px;
-        margin-bottom: 30px;
-        animation: pulse 2s infinite;
-      }
-      
-      @keyframes pulse {
-        0%, 100% { transform: scale(1); opacity: 0.8; }
-        50% { transform: scale(1.05); opacity: 1; }
-      }
-      
-      .loading-title {
-        font-size: 2rem;
-        font-weight: bold;
-        background: linear-gradient(45deg, #4a90e2, #64b5f6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 10px;
-      }
-      
-      .loading-status {
-        color: #64b5f6;
-        font-size: 14px;
-      }
-      
-      /* Hide loading screen when React loads */
-      .App {
-        display: none;
-      }
-      
-      .loaded .loading-screen {
-        display: none;
-      }
-      
-      .loaded .App {
-        display: block;
-      }
-    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run MTG Scanner Pro.</noscript>
-    
-    <!-- Loading Screen -->
-    <div class="loading-screen" id="loading-screen">
-      <div class="loading-logo">
-        MTG<br>SCAN
-      </div>
-      <div class="loading-title">MTG Scanner Pro</div>
-      <div class="loading-status">🧠 Loading AI Vision System...</div>
-    </div>
-    
-    <!-- React App -->
     <div id="root"></div>
-    
-    <script>
-      // Hide loading screen when React loads
-      setTimeout(() => {
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-          loadingScreen.style.display = 'none';
-        }
-        document.body.classList.add('loaded');
-      }, 2000);
-      
-      // Console branding
-      console.log(`
-🎯 MTG SCANNER PRO - PRODUCTION READY
-====================================
-✅ 98% AI Recognition Accuracy  
-✅ 34,983 MTG Cards in Database
-✅ Real-time Gemini Vision AI
-✅ Professional Grade Scanner
-====================================
-      `);
-    </script>
   </body>
 </html>

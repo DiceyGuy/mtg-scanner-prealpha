@@ -1,9 +1,8 @@
-{
+﻿{
   "name": "mtg-scanner-pro",
   "version": "1.0.0",
   "description": "AI-powered MTG card scanner with 98% accuracy",
   "main": "src/index.js",
-  "homepage": "https://mtg-scanner-prealpha.vercel.app",
   "engines": {
     "node": "18.x",
     "npm": "9.x"
@@ -18,7 +17,7 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-scripts": "^5.0.1",
+    "react-scripts": "5.0.1",
     "web-vitals": "^3.3.2"
   },
   "devDependencies": {

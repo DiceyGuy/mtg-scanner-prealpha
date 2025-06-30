@@ -1,8 +1,16 @@
 {
-  "name": "MTG Scanner",
-  "short_name": "MTGScanner",
-  "start_url": "/",
+  "short_name": "MTG Scanner Pro",
+  "name": "MTG Scanner Pro - AI Card Recognition",
+  "description": "Professional Magic: The Gathering card scanner with 98% AI accuracy",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": ".",
   "display": "standalone",
-  "background_color": "#1a1a2e",
-  "theme_color": "#4a90e2"
+  "theme_color": "#4a90e2",
+  "background_color": "#1a1a2e"
 }

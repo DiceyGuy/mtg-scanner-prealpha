@@ -1,45 +1,20 @@
 {
   "name": "mtg-scanner-pro",
   "version": "1.0.0",
-  "description": "AI-powered Magic: The Gathering card scanner with 98% accuracy",
-  "main": "src/index.js",
-  "homepage": "https://mtg-scanner-prealpha.vercel.app",
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "keywords": [
-    "mtg",
-    "magic-the-gathering",
-    "card-scanner",
-    "ai",
-    "gemini",
-    "collection-manager"
-  ],
-  "author": "DiceyGuy",
-  "license": "MIT",
+  "private": true,
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-scripts": "5.0.1"
   },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+  "scripts": {
+    "build": "react-scripts build"
   },
   "engines": {
-    "node": "18.x",
-    "npm": ">=8.0.0"
+    "node": "18.x"
+  },
+  "browserslist": {
+    "production": [">0.2%", "not dead", "not op_mini all"],
+    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
   }
 }

@@ -1,14 +1,10 @@
-﻿import React from 'react';
-import './App.css';
-
-// ✅ Import enhanced Scanner.js with professional UI and cooldown system
+﻿// src/App.js - FIXED VERSION (No syntax errors)
+import React from 'react';
 import Scanner from './Scanner';
 
 function App() {
   return (
-    <div className="App">
-      <Scanner />
-    </div>
+    <Scanner />
   );
 }
 

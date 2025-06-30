@@ -1,0 +1,24 @@
+{
+  "short_name": "MTG Scanner Pro",
+  "name": "MTG Scanner Pro - AI Card Recognition",
+  "description": "Scan Magic: The Gathering cards with 98% accuracy using AI",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "MTG_Scanner_Logo.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#4a90e2",
+  "background_color": "#1a1a2e",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["games", "utilities", "productivity"]
+}

@@ -1,101 +1,59 @@
-// ProfessionalComponents.js - Enhanced UI Components for Production-Ready Look
-
+// ProfessionalComponents.js - Complete File
 import React from 'react';
-
-// 🔥 Professional Loading Screen Component
-export const LoadingScreen = ({ isVisible, progress, status }) => {
-    if (!isVisible) return null;
-
-    return (
-        <div className="loading-screen">
-            <div className="loading-logo">
-                MTG<br/>SCAN
-            </div>
-            <div className="loading-title">MTG Scanner Pro</div>
-            <div className="loading-subtitle">
-                🔥 Advanced AI Card Recognition • Smart Cooldown System • Professional Grade
-            </div>
-            <div className="loading-progress">
-                <div 
-                    className="loading-bar" 
-                    style={{ width: `${progress}%` }}
-                ></div>
-            </div>
-            <div className="loading-status">
-                {status}
-            </div>
-        </div>
-    );
-};
 
 // 🎯 Enhanced Cooldown Status Display
 export const ProfessionalCooldownStatus = ({ cooldownStatus, isVisible }) => {
     if (!isVisible || !cooldownStatus) return null;
 
-    const getStatusClass = () => {
-        if (cooldownStatus.longPauseRemaining > 0) return 'long-pause';
-        return cooldownStatus.canScan ? 'can-scan' : 'cooldown-active';
-    };
-
-    const getStatusText = () => {
-        if (cooldownStatus.longPauseRemaining > 0) {
-            return `Long Pause: ${Math.ceil(cooldownStatus.longPauseRemaining / 1000)}s`;
-        }
-        return cooldownStatus.canScan ? '✅ Ready to Scan' : '⏳ Cooldown Active';
-    };
-
     return (
-        <div className="cooldown-status-overlay">
-            <div className="cooldown-header">
-                Smart Cooldown System
+        <div style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            background: 'rgba(0,0,0,0.85)',
+            color: 'white',
+            padding: '12px',
+            borderRadius: '8px',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            border: '1px solid #4a90e2',
+            minWidth: '220px',
+            zIndex: 1000
+        }}>
+            <div style={{color: '#4a90e2', fontWeight: 'bold', marginBottom: '6px', textAlign: 'center'}}>
+                🔥 PROFESSIONAL Cooldown System
             </div>
-            
-            <div className="cooldown-item">
-                <span className="cooldown-label">API:</span>
-                <span className={`cooldown-value ${cooldownStatus.apiCooldown > 2000 ? 'warning' : ''}`}>
-                    {Math.ceil(cooldownStatus.apiCooldown / 1000)}s
-                </span>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>API:</span>
+                <span style={{color: '#64b5f6'}}>{Math.ceil(cooldownStatus.apiCooldown / 1000)}s</span>
             </div>
-            
-            <div className="cooldown-item">
-                <span className="cooldown-label">Same Card:</span>
-                <span className={`cooldown-value ${cooldownStatus.sameCardCooldown > 10000 ? 'error' : ''}`}>
-                    {Math.ceil(cooldownStatus.sameCardCooldown / 1000)}s
-                </span>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>Same Card:</span>
+                <span style={{color: '#64b5f6'}}>{Math.ceil(cooldownStatus.sameCardCooldown / 1000)}s</span>
             </div>
-            
-            <div className="cooldown-item">
-                <span className="cooldown-label">Consecutive:</span>
-                <span className={`cooldown-value ${cooldownStatus.consecutiveDetections >= 2 ? 'warning' : ''}`}>
-                    {cooldownStatus.consecutiveDetections}/2
-                </span>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>Consecutive:</span>
+                <span style={{color: '#64b5f6'}}>{cooldownStatus.consecutiveDetections}/2</span>
             </div>
-            
-            <div className="cooldown-item">
-                <span className="cooldown-label">Stability:</span>
-                <span className="cooldown-value">
-                    {cooldownStatus.detectionBufferSize || 0}/{cooldownStatus.stabilityRequired || 3}
-                </span>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>Stability:</span>
+                <span style={{color: '#64b5f6'}}>{cooldownStatus.detectionBufferSize || 0}/{cooldownStatus.stabilityRequired || 3}</span>
             </div>
-            
             {cooldownStatus.longPauseRemaining > 0 && (
-                <div className="cooldown-item">
-                    <span className="cooldown-label">Long Pause:</span>
-                    <span className="cooldown-value error">
-                        {Math.ceil(cooldownStatus.longPauseRemaining / 1000)}s
-                    </span>
+                <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                    <span>Long Pause:</span>
+                    <span style={{color: '#ffc107'}}>{Math.ceil(cooldownStatus.longPauseRemaining / 1000)}s</span>
                 </div>
             )}
-            
-            <div className="cooldown-item">
-                <span className="cooldown-label">Edition:</span>
-                <span className={`cooldown-value ${cooldownStatus.isEditionSelectorOpen ? 'warning' : ''}`}>
-                    {cooldownStatus.isEditionSelectorOpen ? '🎭 Open' : '✅ Closed'}
-                </span>
-            </div>
-            
-            <div className={`scan-status-indicator ${getStatusClass()}`}>
-                {getStatusText()}
+            <div style={{
+                marginTop: '6px', 
+                padding: '4px', 
+                background: cooldownStatus.canScan ? 'rgba(40, 167, 69, 0.3)' : 'rgba(220, 53, 69, 0.3)',
+                borderRadius: '4px',
+                textAlign: 'center',
+                fontWeight: 'bold'
+            }}>
+                {cooldownStatus.canScan ? '✅ Ready' : '⏳ Cooldown'}
             </div>
         </div>
     );
@@ -105,29 +63,29 @@ export const ProfessionalCooldownStatus = ({ cooldownStatus, isVisible }) => {
 export const ProfessionalCameraStatus = ({ cameraStatus, cameraInitialized }) => {
     const getStatusInfo = () => {
         switch (cameraStatus) {
-            case 'initializing':
-                return { text: 'Initializing Camera...', class: 'status-initializing' };
-            case 'requesting':
-                return { text: 'Requesting Camera Access...', class: 'status-requesting' };
             case 'ready':
-                return { 
-                    text: `HD Camera Ready${cameraInitialized ? ' • Persistent Mode' : ''}`, 
-                    class: 'status-ready' 
-                };
+                return { text: `✅ HD Camera Ready${cameraInitialized ? ' • Professional' : ''}`, class: 'status-ready' };
             case 'error':
-                return { text: 'Camera Error', class: 'status-error' };
+                return { text: '❌ Camera Error', class: 'status-error' };
             default:
-                return { text: 'Setting up camera...', class: 'status-initializing' };
+                return { text: '🔧 Setting up camera...', class: 'status-initializing' };
         }
     };
 
     const statusInfo = getStatusInfo();
-
     return (
-        <div className="camera-status-overlay">
-            <div className={statusInfo.class}>
-                {statusInfo.text}
-            </div>
+        <div style={{
+            position: 'absolute',
+            bottom: '10px',
+            left: '10px',
+            background: 'rgba(0,0,0,0.8)',
+            color: 'white',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            border: '1px solid #4a90e2'
+        }}>
+            {statusInfo.text}
         </div>
     );
 };
@@ -139,85 +97,88 @@ export const ProfessionalScanControls = ({
     isScanning, 
     onStartScanning, 
     onStopScanning, 
-    cameraStatus, 
-    showEditionSelector,
-    scanningPausedForSelection,
+    cameraStatus,
     cooldownStatus
 }) => {
-    const getScanButtonText = () => {
-        if (showEditionSelector) return '🎭 Choose Edition Below';
-        if (scanningPausedForSelection) return '⏸️ Paused for Selection';
-        if (isScanning) return '⏹️ Stop Smart Scanning';
-        return `🔥 Start Smart ${scanMode === 'single' ? 'Single' : 'Continuous'} Scan`;
-    };
-
-    const getScanButtonClass = () => {
-        let baseClass = 'btn scan-btn';
-        if (isScanning) baseClass += ' scanning';
-        return baseClass;
-    };
-
     return (
-        <div className="scanner-controls">
-            {/* Scan Mode Selection */}
-            <div className="scan-mode-section">
-                <label className="scan-mode-label">
-                    Scan Mode
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
+            {/* Scan Mode */}
+            <div>
+                <label style={{ color: '#b0bec5', marginBottom: '8px', display: 'block' }}>
+                    ⚙️ Scan Mode:
                 </label>
-                <div className="scan-mode-toggle">
+                <div style={{ display: 'flex', gap: '8px' }}>
                     <button
-                        className={`mode-btn ${scanMode === 'continuous' ? 'active' : ''}`}
                         onClick={() => setScanMode('continuous')}
-                        disabled={isScanning || showEditionSelector}
+                        disabled={isScanning}
+                        style={{
+                            flex: 1,
+                            padding: '12px',
+                            border: scanMode === 'continuous' ? '2px solid #4a90e2' : '1px solid #666',
+                            background: scanMode === 'continuous' ? '#4a90e2' : 'rgba(74, 144, 226, 0.1)',
+                            color: 'white',
+                            borderRadius: '8px',
+                            cursor: isScanning ? 'not-allowed' : 'pointer',
+                            fontSize: '13px'
+                        }}
                     >
-                        <span>🔥 Smart Continuous</span>
+                        🔥 Smart Continuous
                     </button>
                     <button
-                        className={`mode-btn ${scanMode === 'single' ? 'active' : ''}`}
                         onClick={() => setScanMode('single')}
-                        disabled={isScanning || showEditionSelector}
+                        disabled={isScanning}
+                        style={{
+                            flex: 1,
+                            padding: '12px',
+                            border: scanMode === 'single' ? '2px solid #4a90e2' : '1px solid #666',
+                            background: scanMode === 'single' ? '#4a90e2' : 'rgba(74, 144, 226, 0.1)',
+                            color: 'white',
+                            borderRadius: '8px',
+                            cursor: isScanning ? 'not-allowed' : 'pointer',
+                            fontSize: '13px'
+                        }}
                     >
-                        <span>📷 Smart Single Shot</span>
+                        📷 Smart Single
                     </button>
                 </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="action-buttons">
-                <button
-                    className={getScanButtonClass()}
-                    onClick={isScanning ? onStopScanning : onStartScanning}
-                    disabled={cameraStatus !== 'ready' || showEditionSelector}
-                >
-                    {getScanButtonText()}
-                    {isScanning && <div className="loading"></div>}
-                </button>
-                
-                {cameraStatus === 'error' && (
-                    <button
-                        className="btn secondary-btn"
-                        onClick={() => window.location.reload()}
-                    >
-                        🔄 Fix Camera
-                    </button>
-                )}
-            </div>
+            {/* Start/Stop Button */}
+            <button
+                onClick={isScanning ? onStopScanning : onStartScanning}
+                disabled={cameraStatus !== 'ready'}
+                style={{
+                    padding: '16px 24px',
+                    border: 'none',
+                    background: isScanning 
+                        ? 'linear-gradient(135deg, #dc3545, #c82333)' 
+                        : 'linear-gradient(135deg, #4a90e2, #64b5f6)',
+                    color: 'white',
+                    borderRadius: '8px',
+                    cursor: cameraStatus !== 'ready' ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    opacity: cameraStatus !== 'ready' ? 0.6 : 1
+                }}
+            >
+                {isScanning ? '⏹️ Stop Smart Scanning' : `🔥 Start Smart ${scanMode} Scan`}
+            </button>
 
             {/* Cooldown Info */}
             {cooldownStatus && !cooldownStatus.canScan && (
                 <div style={{
                     background: 'rgba(251, 191, 36, 0.1)',
                     border: '1px solid rgba(251, 191, 36, 0.3)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    marginTop: '16px',
-                    textAlign: 'center'
+                    borderRadius: '8px',
+                    padding: '12px',
+                    textAlign: 'center',
+                    fontSize: '13px'
                 }}>
-                    <div style={{ color: '#fbbf24', fontWeight: '600', marginBottom: '8px' }}>
+                    <div style={{ color: '#fbbf24', fontWeight: '600' }}>
                         ⏳ Smart Cooldown Active
                     </div>
-                    <div style={{ color: '#94a3b8', fontSize: '13px' }}>
-                        Scanning paused to prevent API spam and ensure stable detection
+                    <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '4px' }}>
+                        Preventing API spam for stable detection
                     </div>
                 </div>
             )}
@@ -226,22 +187,13 @@ export const ProfessionalScanControls = ({
 };
 
 // 💎 Professional Card Result Display
-export const ProfessionalCardResult = ({ 
-    scanResult, 
-    currentCard, 
-    onSaveCard, 
-    onOpenScryfall 
-}) => {
+export const ProfessionalCardResult = ({ scanResult, currentCard, onSaveCard }) => {
     if (!currentCard && !scanResult) {
         return (
-            <div className="card-display">
-                <h3>Card Recognition</h3>
-                <div className="no-card">
-                    No card detected. Position an MTG card clearly in the camera view.
-                    <br/>
-                    <small style={{ color: '#64b5f6', marginTop: '8px', display: 'block' }}>
-                        💡 Ensure good lighting and hold the card steady for best results
-                    </small>
+            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <h3 style={{ color: '#4a90e2', marginBottom: '16px' }}>🎯 Card Recognition</h3>
+                <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+                    No card detected. Position an MTG card in the camera view.
                 </div>
             </div>
         );
@@ -249,14 +201,10 @@ export const ProfessionalCardResult = ({
 
     if (scanResult && !scanResult.hasCard) {
         return (
-            <div className="card-display">
-                <h3>Card Recognition</h3>
-                <div className="no-card">
+            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <h3 style={{ color: '#4a90e2', marginBottom: '16px' }}>🎯 Card Recognition</h3>
+                <div style={{ color: '#94a3b8' }}>
                     {scanResult.message || 'No MTG card detected'}
-                    <br/>
-                    <small style={{ color: '#94a3b8', marginTop: '8px', display: 'block' }}>
-                        Try adjusting the angle, lighting, or distance to the card
-                    </small>
                 </div>
             </div>
         );
@@ -265,185 +213,195 @@ export const ProfessionalCardResult = ({
     const card = currentCard || scanResult;
 
     return (
-        <div className="card-display">
-            <h3>Card Recognition</h3>
+        <div style={{ textAlign: 'center' }}>
+            <h3 style={{ color: '#4a90e2', marginBottom: '20px' }}>🎯 Card Recognition</h3>
             
-            <div className="card-result">
-                <div className="card-name">{card.cardName}</div>
+            <div style={{
+                background: 'rgba(34, 197, 94, 0.1)',
+                border: '1px solid rgba(34, 197, 94, 0.3)',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '16px'
+            }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#22c55e', marginBottom: '12px' }}>
+                    {card.cardName}
+                </div>
                 
-                <div className="card-details">
-                    <div className="card-detail">
-                        <span className="detail-label">Type:</span>
-                        <span className="detail-value">{card.cardType || 'Unknown'}</span>
+                <div style={{ textAlign: 'left', fontSize: '14px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ color: '#94a3b8' }}>Type:</span>
+                        <span style={{ color: 'white', fontWeight: '600' }}>{card.cardType || 'Unknown'}</span>
                     </div>
-                    <div className="card-detail">
-                        <span className="detail-label">Mana Cost:</span>
-                        <span className="detail-value">{card.manaCost || 'N/A'}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ color: '#94a3b8' }}>Confidence:</span>
+                        <span style={{ color: 'white', fontWeight: '600' }}>{card.confidence}%</span>
                     </div>
-                    <div className="card-detail">
-                        <span className="detail-label">Set:</span>
-                        <span className="detail-value">{card.setInfo || 'Unknown'}</span>
-                    </div>
-                    <div className="card-detail">
-                        <span className="detail-label">Confidence:</span>
-                        <span className="detail-value">{card.confidence}%</span>
-                    </div>
-                    <div className="card-detail">
-                        <span className="detail-label">Method:</span>
-                        <span className="detail-value">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ color: '#94a3b8' }}>Method:</span>
+                        <span style={{ color: 'white', fontWeight: '600' }}>
                             {card.isVerified ? '✅ Scryfall Verified' : '🧠 AI Detection'}
                         </span>
                     </div>
                 </div>
                 
-                <div className="confidence-bar">
-                    <div 
-                        className="confidence-fill" 
-                        style={{ width: `${card.confidence}%` }}
-                    ></div>
+                {/* Confidence Bar */}
+                <div style={{
+                    width: '100%',
+                    height: '8px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                    marginBottom: '16px'
+                }}>
+                    <div style={{
+                        height: '100%',
+                        background: 'linear-gradient(90deg, #22c55e, #34d399)',
+                        width: `${card.confidence}%`,
+                        borderRadius: '4px',
+                        transition: 'width 0.3s ease'
+                    }}></div>
                 </div>
 
-                {/* Action Buttons */}
-                <div style={{
-                    display: 'flex',
-                    gap: '12px',
-                    justifyContent: 'center',
-                    marginTop: '20px'
-                }}>
-                    {onSaveCard && (
-                        <button
-                            className="btn secondary-btn"
-                            onClick={() => onSaveCard(card)}
-                            style={{ fontSize: '13px', padding: '10px 16px' }}
-                        >
-                            💾 Save to Collection
-                        </button>
-                    )}
-                    {onOpenScryfall && (
-                        <button
-                            className="btn secondary-btn"
-                            onClick={() => onOpenScryfall(card)}
-                            style={{ fontSize: '13px', padding: '10px 16px' }}
-                        >
-                            🔗 View on Scryfall
-                        </button>
-                    )}
-                </div>
+                {/* Save Button */}
+                {onSaveCard && (
+                    <button
+                        onClick={() => onSaveCard(card)}
+                        style={{
+                            padding: '8px 16px',
+                            background: 'rgba(74, 144, 226, 0.2)',
+                            border: '1px solid #4a90e2',
+                            color: '#4a90e2',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '13px'
+                        }}
+                    >
+                        💾 Save to Collection
+                    </button>
+                )}
             </div>
         </div>
     );
 };
 
 // 🎭 Professional Edition Selector
-export const ProfessionalEditionSelector = ({ 
-    cardName, 
-    availableEditions, 
-    onEditionSelected, 
-    onCancel,
-    aiRecommendation 
-}) => {
+export const ProfessionalEditionSelector = ({ cardName, availableEditions, onEditionSelected, onCancel }) => {
     if (!availableEditions || availableEditions.length === 0) return null;
 
     return (
-        <div className="modal-overlay">
-            <div className="modal">
-                <h3>🎭 Multiple Editions Found</h3>
-                <p style={{ marginBottom: '24px', color: '#94a3b8' }}>
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0,0,0,0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000
+        }}>
+            <div style={{
+                background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f1419 100%)',
+                border: '2px solid #4a90e2',
+                borderRadius: '16px',
+                padding: '32px',
+                maxWidth: '500px',
+                width: '90%',
+                textAlign: 'center',
+                color: 'white'
+            }}>
+                <h3 style={{ color: '#4a90e2', marginBottom: '20px' }}>🎭 Multiple Editions Found</h3>
+                <p style={{ marginBottom: '20px', color: '#94a3b8' }}>
                     Choose the correct edition for <strong style={{ color: '#4a90e2' }}>{cardName}</strong>:
                 </p>
                 
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    marginBottom: '24px',
-                    maxHeight: '400px',
-                    overflowY: 'auto',
-                    padding: '0 8px'
-                }}>
+                <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '20px' }}>
                     {availableEditions.map((edition, index) => (
                         <div
                             key={index}
-                            className={`edition-option ${
-                                aiRecommendation && edition.set === aiRecommendation ? 'recommended' : ''
-                            }`}
                             onClick={() => onEditionSelected(edition)}
+                            style={{
+                                padding: '12px',
+                                margin: '8px 0',
+                                background: 'rgba(74, 144, 226, 0.1)',
+                                border: '1px solid rgba(74, 144, 226, 0.3)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                textAlign: 'left'
+                            }}
                         >
                             <div style={{ fontWeight: '600', marginBottom: '4px' }}>
                                 {edition.set_name || edition.name}
                             </div>
-                            <div style={{ 
-                                fontSize: '12px', 
-                                color: '#94a3b8',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                            }}>
-                                <span>Set: {(edition.set || edition.setCode || 'Unknown').toUpperCase()}</span>
-                                <span>{edition.released_at || edition.releaseDate || 'Unknown date'}</span>
+                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                Set: {(edition.set || 'Unknown').toUpperCase()} • {edition.released_at || 'Unknown date'}
                             </div>
                         </div>
                     ))}
                 </div>
                 
-                <div className="modal-buttons">
-                    <button 
-                        className="modal-btn secondary"
-                        onClick={onCancel}
-                    >
-                        Skip Edition Selection
-                    </button>
-                </div>
-                
-                <div style={{
-                    marginTop: '20px',
-                    fontSize: '12px',
-                    color: '#64b5f6',
-                    textAlign: 'center'
-                }}>
-                    💡 Your selection will be remembered for future scans
-                </div>
+                <button 
+                    onClick={onCancel}
+                    style={{
+                        padding: '12px 24px',
+                        background: 'transparent',
+                        border: '1px solid #666',
+                        color: '#94a3b8',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    Skip Edition Selection
+                </button>
             </div>
         </div>
     );
 };
 
 // 📊 Professional Stats Dashboard
-export const ProfessionalStats = ({ 
-    accuracy = 98,
-    scannedCount = 0,
-    savedCount = 0,
-    aiLearned = 0,
-    isPremium = false,
-    cooldownActive = false
-}) => {
+export const ProfessionalStats = ({ accuracy, scannedCount, savedCount, aiLearned, isPremium, cooldownActive }) => {
     return (
-        <div className="header-stats">
-            <div className="stat-item">
-                <span className="stat-label">Accuracy:</span>
-                <span className="stat-value">{accuracy}%</span>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{
+                background: 'rgba(74, 144, 226, 0.1)',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
+                fontSize: '13px'
+            }}>
+                <span style={{ color: '#94a3b8' }}>Accuracy: </span>
+                <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{accuracy}%</span>
             </div>
-            <div className="stat-item">
-                <span className="stat-label">Scanned:</span>
-                <span className="stat-value">{scannedCount}</span>
+            <div style={{
+                background: 'rgba(74, 144, 226, 0.1)',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
+                fontSize: '13px'
+            }}>
+                <span style={{ color: '#94a3b8' }}>Scanned: </span>
+                <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{scannedCount}</span>
             </div>
-            <div className="stat-item">
-                <span className="stat-label">Collection:</span>
-                <span className="stat-value">{savedCount}</span>
+            <div style={{
+                background: 'rgba(74, 144, 226, 0.1)',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
+                fontSize: '13px'
+            }}>
+                <span style={{ color: '#94a3b8' }}>Collection: </span>
+                <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{savedCount}</span>
             </div>
-            <div className="stat-item">
-                <span className="stat-label">AI Learned:</span>
-                <span className="stat-value">{aiLearned}</span>
-            </div>
-            <div className="stat-item">
-                <span className="stat-label">Cooldown:</span>
-                <span className="stat-value">{cooldownActive ? '⏸️' : '✅'}</span>
-            </div>
-            <div className="stat-item">
-                <span className="stat-label">Status:</span>
-                <span className="stat-value">
-                    {isPremium ? '💎' : '🆓'}
-                </span>
+            <div style={{
+                background: 'rgba(74, 144, 226, 0.1)',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
+                fontSize: '13px'
+            }}>
+                <span style={{ color: '#94a3b8' }}>Cooldown: </span>
+                <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{cooldownActive ? '⏸️' : '✅'}</span>
             </div>
         </div>
     );
@@ -451,75 +409,72 @@ export const ProfessionalStats = ({
 
 // 🎯 Professional Toast Notifications
 export const showProfessionalToast = (message, type = 'info', duration = 3000) => {
-    // Remove existing toasts
     const existingToasts = document.querySelectorAll('.toast-message');
     existingToasts.forEach(toast => toast.remove());
 
     const toast = document.createElement('div');
-    toast.className = `toast-message toast-${type}`;
-    toast.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 16px;">
-                ${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}
-            </span>
-            <span>${message}</span>
-        </div>
+    toast.className = 'toast-message';
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 6px;
+        z-index: 10001;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        max-width: 300px;
     `;
+    toast.textContent = message;
     
     document.body.appendChild(toast);
     
-    // Auto-remove after duration
     setTimeout(() => {
         if (toast.parentNode) {
-            toast.style.transform = 'translateX(100%)';
-            toast.style.opacity = '0';
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.parentNode.removeChild(toast);
-                }
-            }, 300);
+            toast.parentNode.removeChild(toast);
         }
     }, duration);
-    
-    // Click to dismiss
-    toast.addEventListener('click', () => {
-        toast.style.transform = 'translateX(100%)';
-        toast.style.opacity = '0';
-        setTimeout(() => {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-            }
-        }, 300);
-    });
 };
 
 // 🎨 Professional Tab Navigation
-export const ProfessionalTabs = ({ activeTab, onTabChange, savedCards, isPremium }) => {
+export const ProfessionalTabs = ({ activeTab, onTabChange, savedCards }) => {
     const tabs = [
-        { 
-            id: 'scanner', 
-            label: '🔍 Scanner', 
-            badge: null 
-        },
-        { 
-            id: 'collection', 
-            label: '🃏 Collection', 
-            badge: savedCards?.length || 0 
-        },
-        { 
-            id: 'knowledge', 
-            label: '📚 MTG Knowledge', 
-            badge: isPremium ? '💎' : null 
-        }
+        { id: 'scanner', label: '🔍 Scanner', badge: null },
+        { id: 'deck', label: '🃏 Collection', badge: savedCards?.length || 0 },
+        { id: 'knowledge', label: '📚 Knowledge', badge: null }
     ];
 
     return (
-        <div className="tab-navigation">
+        <div style={{
+            display: 'flex',
+            gap: '4px',
+            marginBottom: '20px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            padding: '4px',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
             {tabs.map(tab => (
                 <button
                     key={tab.id}
-                    className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
                     onClick={() => onTabChange(tab.id)}
+                    style={{
+                        flex: 1,
+                        padding: '12px 16px',
+                        border: 'none',
+                        background: activeTab === tab.id ? 'linear-gradient(45deg, #4a90e2, #64b5f6)' : 'transparent',
+                        color: activeTab === tab.id ? 'white' : '#94a3b8',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                    }}
                 >
                     <span>{tab.label}</span>
                     {tab.badge !== null && (
@@ -541,7 +496,512 @@ export const ProfessionalTabs = ({ activeTab, onTabChange, savedCards, isPremium
 };
 
 export default {
-    LoadingScreen,
+    ProfessionalCooldownStatus,
+    ProfessionalCameraStatus,
+    ProfessionalScanControls,
+    ProfessionalCardResult,
+    ProfessionalEditionSelector,
+    ProfessionalStats,
+    showProfessionalToast,
+    ProfessionalTabs
+};// ProfessionalComponents.js - Complete File
+import React from 'react';
+
+// 🎯 Enhanced Cooldown Status Display
+export const ProfessionalCooldownStatus = ({ cooldownStatus, isVisible }) => {
+    if (!isVisible || !cooldownStatus) return null;
+
+    return (
+        <div style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            background: 'rgba(0,0,0,0.85)',
+            color: 'white',
+            padding: '12px',
+            borderRadius: '8px',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            border: '1px solid #4a90e2',
+            minWidth: '220px',
+            zIndex: 1000
+        }}>
+            <div style={{color: '#4a90e2', fontWeight: 'bold', marginBottom: '6px', textAlign: 'center'}}>
+                🔥 PROFESSIONAL Cooldown System
+            </div>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>API:</span>
+                <span style={{color: '#64b5f6'}}>{Math.ceil(cooldownStatus.apiCooldown / 1000)}s</span>
+            </div>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>Same Card:</span>
+                <span style={{color: '#64b5f6'}}>{Math.ceil(cooldownStatus.sameCardCooldown / 1000)}s</span>
+            </div>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>Consecutive:</span>
+                <span style={{color: '#64b5f6'}}>{cooldownStatus.consecutiveDetections}/2</span>
+            </div>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>Stability:</span>
+                <span style={{color: '#64b5f6'}}>{cooldownStatus.detectionBufferSize || 0}/{cooldownStatus.stabilityRequired || 3}</span>
+            </div>
+            {cooldownStatus.longPauseRemaining > 0 && (
+                <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                    <span>Long Pause:</span>
+                    <span style={{color: '#ffc107'}}>{Math.ceil(cooldownStatus.longPauseRemaining / 1000)}s</span>
+                </div>
+            )}
+            <div style={{
+                marginTop: '6px', 
+                padding: '4px', 
+                background: cooldownStatus.canScan ? 'rgba(40, 167, 69, 0.3)' : 'rgba(220, 53, 69, 0.3)',
+                borderRadius: '4px',
+                textAlign: 'center',
+                fontWeight: 'bold'
+            }}>
+                {cooldownStatus.canScan ? '✅ Ready' : '⏳ Cooldown'}
+            </div>
+        </div>
+    );
+};
+
+// 📱 Professional Camera Status
+export const ProfessionalCameraStatus = ({ cameraStatus, cameraInitialized }) => {
+    const getStatusInfo = () => {
+        switch (cameraStatus) {
+            case 'ready':
+                return { text: `✅ HD Camera Ready${cameraInitialized ? ' • Professional' : ''}`, class: 'status-ready' };
+            case 'error':
+                return { text: '❌ Camera Error', class: 'status-error' };
+            default:
+                return { text: '🔧 Setting up camera...', class: 'status-initializing' };
+        }
+    };
+
+    const statusInfo = getStatusInfo();
+    return (
+        <div style={{
+            position: 'absolute',
+            bottom: '10px',
+            left: '10px',
+            background: 'rgba(0,0,0,0.8)',
+            color: 'white',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            border: '1px solid #4a90e2'
+        }}>
+            {statusInfo.text}
+        </div>
+    );
+};
+
+// 🎮 Professional Scan Controls
+export const ProfessionalScanControls = ({ 
+    scanMode, 
+    setScanMode, 
+    isScanning, 
+    onStartScanning, 
+    onStopScanning, 
+    cameraStatus,
+    cooldownStatus
+}) => {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
+            {/* Scan Mode */}
+            <div>
+                <label style={{ color: '#b0bec5', marginBottom: '8px', display: 'block' }}>
+                    ⚙️ Scan Mode:
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                        onClick={() => setScanMode('continuous')}
+                        disabled={isScanning}
+                        style={{
+                            flex: 1,
+                            padding: '12px',
+                            border: scanMode === 'continuous' ? '2px solid #4a90e2' : '1px solid #666',
+                            background: scanMode === 'continuous' ? '#4a90e2' : 'rgba(74, 144, 226, 0.1)',
+                            color: 'white',
+                            borderRadius: '8px',
+                            cursor: isScanning ? 'not-allowed' : 'pointer',
+                            fontSize: '13px'
+                        }}
+                    >
+                        🔥 Smart Continuous
+                    </button>
+                    <button
+                        onClick={() => setScanMode('single')}
+                        disabled={isScanning}
+                        style={{
+                            flex: 1,
+                            padding: '12px',
+                            border: scanMode === 'single' ? '2px solid #4a90e2' : '1px solid #666',
+                            background: scanMode === 'single' ? '#4a90e2' : 'rgba(74, 144, 226, 0.1)',
+                            color: 'white',
+                            borderRadius: '8px',
+                            cursor: isScanning ? 'not-allowed' : 'pointer',
+                            fontSize: '13px'
+                        }}
+                    >
+                        📷 Smart Single
+                    </button>
+                </div>
+            </div>
+
+            {/* Start/Stop Button */}
+            <button
+                onClick={isScanning ? onStopScanning : onStartScanning}
+                disabled={cameraStatus !== 'ready'}
+                style={{
+                    padding: '16px 24px',
+                    border: 'none',
+                    background: isScanning 
+                        ? 'linear-gradient(135deg, #dc3545, #c82333)' 
+                        : 'linear-gradient(135deg, #4a90e2, #64b5f6)',
+                    color: 'white',
+                    borderRadius: '8px',
+                    cursor: cameraStatus !== 'ready' ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    opacity: cameraStatus !== 'ready' ? 0.6 : 1
+                }}
+            >
+                {isScanning ? '⏹️ Stop Smart Scanning' : `🔥 Start Smart ${scanMode} Scan`}
+            </button>
+
+            {/* Cooldown Info */}
+            {cooldownStatus && !cooldownStatus.canScan && (
+                <div style={{
+                    background: 'rgba(251, 191, 36, 0.1)',
+                    border: '1px solid rgba(251, 191, 36, 0.3)',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    textAlign: 'center',
+                    fontSize: '13px'
+                }}>
+                    <div style={{ color: '#fbbf24', fontWeight: '600' }}>
+                        ⏳ Smart Cooldown Active
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '4px' }}>
+                        Preventing API spam for stable detection
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// 💎 Professional Card Result Display
+export const ProfessionalCardResult = ({ scanResult, currentCard, onSaveCard }) => {
+    if (!currentCard && !scanResult) {
+        return (
+            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <h3 style={{ color: '#4a90e2', marginBottom: '16px' }}>🎯 Card Recognition</h3>
+                <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+                    No card detected. Position an MTG card in the camera view.
+                </div>
+            </div>
+        );
+    }
+
+    if (scanResult && !scanResult.hasCard) {
+        return (
+            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <h3 style={{ color: '#4a90e2', marginBottom: '16px' }}>🎯 Card Recognition</h3>
+                <div style={{ color: '#94a3b8' }}>
+                    {scanResult.message || 'No MTG card detected'}
+                </div>
+            </div>
+        );
+    }
+
+    const card = currentCard || scanResult;
+
+    return (
+        <div style={{ textAlign: 'center' }}>
+            <h3 style={{ color: '#4a90e2', marginBottom: '20px' }}>🎯 Card Recognition</h3>
+            
+            <div style={{
+                background: 'rgba(34, 197, 94, 0.1)',
+                border: '1px solid rgba(34, 197, 94, 0.3)',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '16px'
+            }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#22c55e', marginBottom: '12px' }}>
+                    {card.cardName}
+                </div>
+                
+                <div style={{ textAlign: 'left', fontSize: '14px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ color: '#94a3b8' }}>Type:</span>
+                        <span style={{ color: 'white', fontWeight: '600' }}>{card.cardType || 'Unknown'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ color: '#94a3b8' }}>Confidence:</span>
+                        <span style={{ color: 'white', fontWeight: '600' }}>{card.confidence}%</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ color: '#94a3b8' }}>Method:</span>
+                        <span style={{ color: 'white', fontWeight: '600' }}>
+                            {card.isVerified ? '✅ Scryfall Verified' : '🧠 AI Detection'}
+                        </span>
+                    </div>
+                </div>
+                
+                {/* Confidence Bar */}
+                <div style={{
+                    width: '100%',
+                    height: '8px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                    marginBottom: '16px'
+                }}>
+                    <div style={{
+                        height: '100%',
+                        background: 'linear-gradient(90deg, #22c55e, #34d399)',
+                        width: `${card.confidence}%`,
+                        borderRadius: '4px',
+                        transition: 'width 0.3s ease'
+                    }}></div>
+                </div>
+
+                {/* Save Button */}
+                {onSaveCard && (
+                    <button
+                        onClick={() => onSaveCard(card)}
+                        style={{
+                            padding: '8px 16px',
+                            background: 'rgba(74, 144, 226, 0.2)',
+                            border: '1px solid #4a90e2',
+                            color: '#4a90e2',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '13px'
+                        }}
+                    >
+                        💾 Save to Collection
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// 🎭 Professional Edition Selector
+export const ProfessionalEditionSelector = ({ cardName, availableEditions, onEditionSelected, onCancel }) => {
+    if (!availableEditions || availableEditions.length === 0) return null;
+
+    return (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0,0,0,0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000
+        }}>
+            <div style={{
+                background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f1419 100%)',
+                border: '2px solid #4a90e2',
+                borderRadius: '16px',
+                padding: '32px',
+                maxWidth: '500px',
+                width: '90%',
+                textAlign: 'center',
+                color: 'white'
+            }}>
+                <h3 style={{ color: '#4a90e2', marginBottom: '20px' }}>🎭 Multiple Editions Found</h3>
+                <p style={{ marginBottom: '20px', color: '#94a3b8' }}>
+                    Choose the correct edition for <strong style={{ color: '#4a90e2' }}>{cardName}</strong>:
+                </p>
+                
+                <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '20px' }}>
+                    {availableEditions.map((edition, index) => (
+                        <div
+                            key={index}
+                            onClick={() => onEditionSelected(edition)}
+                            style={{
+                                padding: '12px',
+                                margin: '8px 0',
+                                background: 'rgba(74, 144, 226, 0.1)',
+                                border: '1px solid rgba(74, 144, 226, 0.3)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                textAlign: 'left'
+                            }}
+                        >
+                            <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                                {edition.set_name || edition.name}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                Set: {(edition.set || 'Unknown').toUpperCase()} • {edition.released_at || 'Unknown date'}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                
+                <button 
+                    onClick={onCancel}
+                    style={{
+                        padding: '12px 24px',
+                        background: 'transparent',
+                        border: '1px solid #666',
+                        color: '#94a3b8',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    Skip Edition Selection
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// 📊 Professional Stats Dashboard
+export const ProfessionalStats = ({ accuracy, scannedCount, savedCount, aiLearned, isPremium, cooldownActive }) => {
+    return (
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{
+                background: 'rgba(74, 144, 226, 0.1)',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
+                fontSize: '13px'
+            }}>
+                <span style={{ color: '#94a3b8' }}>Accuracy: </span>
+                <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{accuracy}%</span>
+            </div>
+            <div style={{
+                background: 'rgba(74, 144, 226, 0.1)',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
+                fontSize: '13px'
+            }}>
+                <span style={{ color: '#94a3b8' }}>Scanned: </span>
+                <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{scannedCount}</span>
+            </div>
+            <div style={{
+                background: 'rgba(74, 144, 226, 0.1)',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
+                fontSize: '13px'
+            }}>
+                <span style={{ color: '#94a3b8' }}>Collection: </span>
+                <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{savedCount}</span>
+            </div>
+            <div style={{
+                background: 'rgba(74, 144, 226, 0.1)',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
+                fontSize: '13px'
+            }}>
+                <span style={{ color: '#94a3b8' }}>Cooldown: </span>
+                <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{cooldownActive ? '⏸️' : '✅'}</span>
+            </div>
+        </div>
+    );
+};
+
+// 🎯 Professional Toast Notifications
+export const showProfessionalToast = (message, type = 'info', duration = 3000) => {
+    const existingToasts = document.querySelectorAll('.toast-message');
+    existingToasts.forEach(toast => toast.remove());
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-message';
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 6px;
+        z-index: 10001;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        max-width: 300px;
+    `;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, duration);
+};
+
+// 🎨 Professional Tab Navigation
+export const ProfessionalTabs = ({ activeTab, onTabChange, savedCards }) => {
+    const tabs = [
+        { id: 'scanner', label: '🔍 Scanner', badge: null },
+        { id: 'deck', label: '🃏 Collection', badge: savedCards?.length || 0 },
+        { id: 'knowledge', label: '📚 Knowledge', badge: null }
+    ];
+
+    return (
+        <div style={{
+            display: 'flex',
+            gap: '4px',
+            marginBottom: '20px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            padding: '4px',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+            {tabs.map(tab => (
+                <button
+                    key={tab.id}
+                    onClick={() => onTabChange(tab.id)}
+                    style={{
+                        flex: 1,
+                        padding: '12px 16px',
+                        border: 'none',
+                        background: activeTab === tab.id ? 'linear-gradient(45deg, #4a90e2, #64b5f6)' : 'transparent',
+                        color: activeTab === tab.id ? 'white' : '#94a3b8',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                    }}
+                >
+                    <span>{tab.label}</span>
+                    {tab.badge !== null && (
+                        <span style={{
+                            background: 'rgba(74, 144, 226, 0.2)',
+                            color: '#4a90e2',
+                            padding: '2px 6px',
+                            borderRadius: '10px',
+                            fontSize: '11px',
+                            fontWeight: '700'
+                        }}>
+                            {tab.badge}
+                        </span>
+                    )}
+                </button>
+            ))}
+        </div>
+    );
+};
+
+export default {
     ProfessionalCooldownStatus,
     ProfessionalCameraStatus,
     ProfessionalScanControls,

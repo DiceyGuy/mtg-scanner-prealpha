@@ -1,4 +1,17 @@
-// Scanner.js - PROFESSIONAL VERSION with Enhanced UI Components
+// Scanner.js - Add these imports at top:
+import {
+    ProfessionalTabs,
+    ProfessionalCardResult,
+    showProfessionalToast
+} from './ProfessionalComponents';
+import DeckManager from './DeckManager';
+import MTGKnowledgeBase from './MTGKnowledgeBase';
+
+// Add tab state:
+const [activeTab, setActiveTab] = useState('scanner');
+
+// Add tab navigation in JSX                                                                                                                                    
+// // // Scanner.js - PROFESSIONAL VERSION with Enhanced UI Components
 import React, { useState, useRef, useEffect } from 'react';
 import ClaudeVisionService from './ClaudeVisionService';
 import CardDisplayUI from './CardDisplayUI';

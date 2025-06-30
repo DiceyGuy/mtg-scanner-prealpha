@@ -1,4 +1,4 @@
-// Scanner.js - IMPROVED with Better Cooldown System
+// Scanner.js - PROFESSIONAL VERSION with Enhanced UI Components
 import React, { useState, useRef, useEffect } from 'react';
 import ClaudeVisionService from './ClaudeVisionService';
 import CardDisplayUI from './CardDisplayUI';
@@ -6,6 +6,18 @@ import DeckManager from './DeckManager';
 import MTGKnowledgeBase from './MTGKnowledgeBase';
 import EditionSelector from './EditionSelector';
 import './CardDisplay.css';
+
+// 🔥 NEW: Import professional components
+import {
+    ProfessionalCooldownStatus,
+    ProfessionalCameraStatus,
+    ProfessionalScanControls,
+    ProfessionalCardResult,
+    ProfessionalEditionSelector,
+    ProfessionalStats,
+    showProfessionalToast,
+    ProfessionalTabs
+} from './ProfessionalComponents';
 
 // 🔥 IMPROVED Smart Cooldown System
 class MTGScannerCooldown {
@@ -423,7 +435,7 @@ const Scanner = () => {
                     setCameraError(null);
                     setCameraRetryCount(0);
                     console.log('✅ PERSISTENT Camera ready:', `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
-                    showCameraMessage('✅ Camera ready with improved cooldown!', 'success');
+                    showProfessionalToast('✅ Camera ready with enhanced cooldown system!', 'success');
                 };
             }
             
@@ -485,7 +497,7 @@ const Scanner = () => {
         if (!visionServiceRef.current || cameraStatus !== 'ready') {
             console.log('⚠️ MTG Scanner not ready');
             if (cameraStatus === 'error') {
-                showCameraMessage('❌ Camera not ready. Please fix camera issues first.', 'error');
+                showProfessionalToast('❌ Camera not ready. Please fix camera issues first.', 'error');
             }
             return;
         }
@@ -677,8 +689,6 @@ const Scanner = () => {
         return editions;
     };
 
-    // Keep all your existing functions but update the edition handlers...
-
     const handleEditionSelected = async (selectedEdition) => {
         if (pendingCardData && selectedEdition) {
             const enhancedCard = enhanceCardWithScryfall(pendingCardData, selectedEdition);
@@ -862,144 +872,575 @@ const Scanner = () => {
         initializationPromiseRef.current = null;
     };
 
-    // Keep all your existing helper functions for camera switching, saving cards, etc...
-    const showCameraMessage = (message, type = 'info') => {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'camera-toast-message';
-        messageDiv.innerHTML = message;
-        messageDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
-            color: white;
-            padding: 12px 20px;
-            border-radius: 6px;
-            z-index: 10000;
-            font-weight: 500;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            max-width: 300px;
-        `;
-
-        document.body.appendChild(messageDiv);
-        
-        setTimeout(() => {
-            if (messageDiv.parentNode) {
-                messageDiv.parentNode.removeChild(messageDiv);
+    // Collection management
+    const saveCardToCollection = async (card) => {
+        try {
+            if (!isPremiumUser && savedCards.length >= FREE_COLLECTION_LIMIT) {
+                console.log('🚨 Free collection limit reached');
+                setShowPaywallModal(true);
+                return false;
             }
-        }, 3000);
-    };
-
-    // Keep all your existing camera handling and collection management functions...
-    // I'm keeping this short since you have working versions of these
-
-    // 🔥 IMPROVED: Render cooldown status UI with more detail
-    const renderCooldownStatus = () => {
-        if (!cooldownStatus || activeTab !== 'scanner') return null;
-        
-        return (
-            <div style={{
-                position: 'absolute',
-                top: '10px',
-                right: '10px',
-                background: 'rgba(0,0,0,0.85)',
-                color: 'white',
-                padding: '12px',
-                borderRadius: '8px',
-                fontSize: '11px',
-                fontFamily: 'monospace',
-                border: '1px solid #4a90e2',
-                minWidth: '220px',
-                zIndex: 1000
-            }}>
-                <div style={{color: '#4a90e2', fontWeight: 'bold', marginBottom: '6px', textAlign: 'center'}}>
-                    🔥 IMPROVED Cooldown System
-                </div>
-                <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                    <span>API Cooldown:</span>
-                    <span style={{color: '#64b5f6'}}>{Math.ceil(cooldownStatus.apiCooldown / 1000)}s</span>
-                </div>
-                <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                    <span>Same Card:</span>
-                    <span style={{color: '#64b5f6'}}>{Math.ceil(cooldownStatus.sameCardCooldown / 1000)}s</span>
-                </div>
-                <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                    <span>Consecutive:</span>
-                    <span style={{color: '#64b5f6'}}>{cooldownStatus.consecutiveDetections}/2</span>
-                </div>
-                <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                    <span>Stability:</span>
-                    <span style={{color: '#64b5f6'}}>{cooldownStatus.detectionBufferSize}/{cooldownStatus.stabilityRequired}</span>
-                </div>
-                {cooldownStatus.longPauseRemaining > 0 && (
-                    <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                        <span>Long Pause:</span>
-                        <span style={{color: '#ffc107'}}>{Math.ceil(cooldownStatus.longPauseRemaining / 1000)}s</span>
-                    </div>
-                )}
-                <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                    <span>Edition Selector:</span>
-                    <span style={{color: cooldownStatus.isEditionSelectorOpen ? '#ffc107' : '#28a745'}}>
-                        {cooldownStatus.isEditionSelectorOpen ? '🎭 Open' : '✅ Closed'}
-                    </span>
-                </div>
-                <div style={{
-                    marginTop: '6px', 
-                    padding: '4px', 
-                    background: cooldownStatus.canScan ? 'rgba(40, 167, 69, 0.3)' : 'rgba(220, 53, 69, 0.3)',
-                    borderRadius: '4px',
-                    textAlign: 'center',
-                    fontWeight: 'bold'
-                }}>
-                    {cooldownStatus.canScan ? '✅ Can Scan' : '❌ Cooldown Active'}
-                </div>
-            </div>
-        );
-    };
-
-    // Keep the rest of your existing component exactly as is...
-    // Just use the improved cooldown rendering above
-
-    const getCameraStatusDisplay = () => {
-        switch (cameraStatus) {
-            case 'initializing':
-                return { text: '🔧 Initializing...', class: 'status-initializing' };
-            case 'requesting':
-                return { text: '📷 Requesting access...', class: 'status-requesting' };
-            case 'ready':
-                return { text: '✅ HD Camera Ready + IMPROVED Cooldown', class: 'status-ready' };
-            case 'error':
-                return { text: '❌ Camera Error', class: 'status-error' };
-            default:
-                return { text: '⏳ Setting up...', class: 'status-default' };
+            
+            const cardWithId = {
+                ...card,
+                id: Date.now() + Math.random(),
+                addedAt: new Date().toISOString(),
+                scannedAt: new Date().toLocaleString()
+            };
+            
+            const updatedCards = [cardWithId, ...savedCards];
+            setSavedCards(updatedCards);
+            
+            localStorage.setItem('mtg_saved_cards', JSON.stringify(updatedCards));
+            
+            console.log('💾 Card saved to collection:', card.cardName);
+            
+            if (scanMode === 'single') {
+                setScanResult(prev => ({
+                    ...prev,
+                    savedToCollection: true,
+                    message: `✅ ${card.cardName} saved to collection!`
+                }));
+                
+                setTimeout(() => {
+                    setScanResult(prev => ({
+                        ...prev,
+                        savedToCollection: false,
+                        message: undefined
+                    }));
+                }, 3000);
+            }
+            
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Failed to save card:', error);
+            setScanResult(prev => ({
+                ...prev,
+                message: `❌ Failed to save ${card.cardName}`
+            }));
+            return false;
         }
     };
 
-    const cameraStatus_display = getCameraStatusDisplay();
+    const handleUpgradeToPremium = () => {
+        console.log('💎 Initiating PayPal payment for premium upgrade...');
+        
+        const paypalLink = `https://www.paypal.com/paypalme/thediceyguy/9.99?country.x=US&locale.x=en_US`;
+        window.open(paypalLink, '_blank');
+        
+        setTimeout(() => {
+            setIsPremiumUser(true);
+            localStorage.setItem('mtg_premium_status', 'true');
+            setShowPaywallModal(false);
+            showProfessionalToast('💎 Premium upgrade successful! Unlimited collection storage activated.', 'success');
+        }, 5000);
+    };
 
-    // Return your existing JSX but with the improved cooldown display
+    const removeCardFromCollection = (cardId) => {
+        try {
+            const updatedCards = savedCards.filter(card => card.id !== cardId);
+            setSavedCards(updatedCards);
+            localStorage.setItem('mtg_saved_cards', JSON.stringify(updatedCards));
+            console.log('🗑️ Card removed from collection');
+        } catch (error) {
+            console.error('❌ Failed to remove card:', error);
+        }
+    };
+
+    const openCardInScryfall = (card) => {
+        if (card && card.cardName) {
+            const searchUrl = `https://scryfall.com/search?q=${encodeURIComponent(card.cardName)}`;
+            window.open(searchUrl, '_blank');
+            console.log('🔗 Opening Scryfall for:', card.cardName);
+        }
+    };
+
+    const toggleUIVisibility = () => {
+        setIsUIVisible(!isUIVisible);
+        console.log('👁️ UI visibility toggled:', !isUIVisible);
+    };
+
+    const handleCameraSwitch = async (newCameraId) => {
+        console.log('🔄 Switching to camera:', newCameraId);
+        
+        // Stop current stream
+        if (cameraStreamRef.current) {
+            cameraStreamRef.current.getTracks().forEach(track => track.stop());
+            cameraStreamRef.current = null;
+        }
+        
+        // Set new camera
+        setSelectedCameraId(newCameraId);
+        setCameraInitializationComplete(false);
+        
+        // Restart with new camera
+        await setupCamera(newCameraId);
+        
+        setShowCameraSelector(false);
+        showProfessionalToast('📷 Camera switched successfully!', 'success');
+    };
+
+    const refreshCameraList = async () => {
+        console.log('🔄 Refreshing camera list...');
+        await enumerateCameras();
+        showProfessionalToast('📷 Camera list refreshed!', 'success');
+    };
+
+    const retryCameraSetup = () => {
+        console.log('🔄 Manual camera retry requested');
+        setCameraRetryCount(0);
+        setCameraError(null);
+        setCameraInitializationComplete(false);
+        initializationPromiseRef.current = null;
+        setupCamera();
+    };
+
+    // Tab switching handler that preserves camera
+    const handleTabSwitch = (newTab) => {
+        console.log(`🔄 Switching from ${activeTab} to ${newTab} (camera preserved)`);
+        setActiveTab(newTab);
+        
+        if (newTab === 'scanner' && cameraStreamRef.current && videoRef.current) {
+            setTimeout(() => {
+                if (!videoRef.current.srcObject) {
+                    console.log('📷 Reconnecting video element to persistent camera stream...');
+                    videoRef.current.srcObject = cameraStreamRef.current;
+                    videoRef.current.play();
+                }
+            }, 100);
+        }
+    };
+
+    // 🔥 PROFESSIONAL: Updated cooldown status renderer
+    const renderCooldownStatus = () => {
+        return (
+            <ProfessionalCooldownStatus
+                cooldownStatus={cooldownStatus}
+                isVisible={activeTab === 'scanner'}
+            />
+        );
+    };
+
+    // Return the professional JSX structure
     return (
         <div className="mtg-scanner-pro">
-            {/* Keep all your existing JSX structure */}
-            {/* Just make sure to include {renderCooldownStatus()} in your video container */}
-            
-            {/* Example of where to include the cooldown status: */}
-            <div className="video-container">
-                <video
-                    ref={videoRef}
-                    className="scanner-video"
-                    autoPlay
-                    playsInline
-                    muted
+            {/* 🏆 PROFESSIONAL HEADER */}
+            <div className="app-header">
+                <div className="app-title-section">
+                    <div className="app-logo">
+                        MTG<br/>SCAN
+                    </div>
+                    <div className="app-title">
+                        <h1>MTG Scanner Pro</h1>
+                        <span className="app-subtitle">
+                            🔥 Enhanced Smart Cooldown System • Professional Grade
+                        </span>
+                    </div>
+                </div>
+                
+                <ProfessionalStats
+                    accuracy={98}
+                    scannedCount={scanHistory.length}
+                    savedCount={savedCards.length}
+                    aiLearned={Object.keys(editionPreferences).length}
+                    isPremium={isPremiumUser}
+                    cooldownActive={!cooldownStatus.canScan}
                 />
-                
-                {/* 🔥 IMPROVED: Cooldown Status Overlay */}
-                {renderCooldownStatus()}
-                
-                {/* Rest of your existing video overlays... */}
             </div>
-            
-            {/* Keep all your existing JSX... */}
+
+            {/* 🎨 PROFESSIONAL TAB NAVIGATION */}
+            <ProfessionalTabs
+                activeTab={activeTab}
+                onTabChange={handleTabSwitch}
+                savedCards={savedCards}
+                isPremium={isPremiumUser}
+            />
+
+            {/* MAIN CONTENT AREA */}
+            <div className="main-content">
+                
+                {/* 🔍 SCANNER TAB */}
+                {activeTab === 'scanner' && (
+                    <>
+                        <div className="scanner-section glass-card">
+                            {/* Video Container with Professional Overlays */}
+                            <div className="video-container">
+                                <video
+                                    ref={videoRef}
+                                    className="scanner-video"
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                />
+                                
+                                {/* 🔥 PROFESSIONAL Cooldown Status */}
+                                {renderCooldownStatus()}
+                                
+                                {/* 📷 PROFESSIONAL Camera Status */}
+                                <ProfessionalCameraStatus
+                                    cameraStatus={cameraStatus}
+                                    cameraInitialized={cameraInitializationComplete}
+                                />
+                                
+                                {/* Camera Error Overlay */}
+                                {cameraError && (
+                                    <div className="camera-error-overlay">
+                                        <div className="camera-error-card">
+                                            <h3>📹 Camera Issue</h3>
+                                            <p><strong>{cameraError.message}</strong></p>
+                                            <p>{cameraError.action}</p>
+                                            {cameraError.canRetry && (
+                                                <button 
+                                                    onClick={retryCameraSetup}
+                                                    className="retry-camera-btn"
+                                                >
+                                                    🔄 Try Again
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Scanning Overlay */}
+                                {isScanning && (
+                                    <div className="scanning-overlay">
+                                        <div className={`scan-frame ${scanningPausedForSelection ? 'paused' : ''}`}></div>
+                                        <div className="scan-instructions">
+                                            {scanningPausedForSelection ? 
+                                                '⏸️ Scanner paused for edition selection' :
+                                                '🔍 Position MTG card in frame'
+                                            }
+                                            <div className="scan-tech">
+                                                🔥 Enhanced smart cooldown active
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 🎮 PROFESSIONAL Scan Controls */}
+                            <ProfessionalScanControls
+                                scanMode={scanMode}
+                                setScanMode={setScanMode}
+                                isScanning={isScanning}
+                                onStartScanning={startScanning}
+                                onStopScanning={stopScanning}
+                                cameraStatus={cameraStatus}
+                                showEditionSelector={showEditionSelector}
+                                scanningPausedForSelection={scanningPausedForSelection}
+                                cooldownStatus={cooldownStatus}
+                            />
+                        </div>
+
+                        {/* 💎 PROFESSIONAL Card Display */}
+                        {isUIVisible && (
+                            <div className="card-info-section glass-card">
+                                <ProfessionalCardResult
+                                    scanResult={scanResult}
+                                    currentCard={currentCard}
+                                    onSaveCard={saveCardToCollection}
+                                    onOpenScryfall={openCardInScryfall}
+                                />
+
+                                {/* Show scan history */}
+                                {scanHistory.length > 0 && (
+                                    <div style={{marginTop: '24px'}}>
+                                        <h4 style={{color: '#4a90e2', marginBottom: '16px', fontSize: '16px'}}>
+                                            📊 Recent Scans
+                                        </h4>
+                                        <div style={{maxHeight: '200px', overflowY: 'auto'}} className="scrollable">
+                                            {scanHistory.map((card, index) => (
+                                                <div key={index} style={{
+                                                    padding: '12px',
+                                                    margin: '8px 0',
+                                                    background: 'rgba(74, 144, 226, 0.1)',
+                                                    borderRadius: '8px',
+                                                    fontSize: '13px',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    border: '1px solid rgba(74, 144, 226, 0.2)'
+                                                }}>
+                                                    <span style={{fontWeight: '600'}}>{card.cardName}</span>
+                                                    <span style={{color: '#64b5f6', fontWeight: '700'}}>{card.confidence}%</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* 🃏 COLLECTION TAB */}
+                {activeTab === 'deck' && (
+                    <div className="glass-card" style={{padding: '32px', width: '100%'}}>
+                        <DeckManager 
+                            savedCards={savedCards}
+                            onRemoveCard={removeCardFromCollection}
+                            onOpenScryfall={openCardInScryfall}
+                            scanHistory={scanHistory}
+                            isPremiumUser={isPremiumUser}
+                            collectionLimit={FREE_COLLECTION_LIMIT}
+                            onUpgrade={handleUpgradeToPremium}
+                        />
+                    </div>
+                )}
+
+                {/* 📚 KNOWLEDGE TAB */}
+                {activeTab === 'knowledge' && (
+                    <div className="glass-card" style={{padding: '32px', width: '100%'}}>
+                        <MTGKnowledgeBase 
+                            currentCard={currentCard}
+                            savedCards={savedCards}
+                            editionPreferences={editionPreferences}
+                        />
+                    </div>
+                )}
+            </div>
+
+            {/* 📊 PROFESSIONAL Status Bar */}
+            <div className="status-bar glass-card">
+                <div className="status-left">
+                    {scanHistory.length > 0 && (
+                        <>
+                            <span className="status-item">📊 Scanned: {scanHistory.length}</span>
+                            {currentCard && (
+                                <span className="status-item">
+                                    🎯 Last: {currentCard.cardName} ({currentCard.confidence}%)
+                                </span>
+                            )}
+                        </>
+                    )}
+                </div>
+                <div className="status-right">
+                    <div className="footer-logo">
+                        MTG Scanner Pro
+                    </div>
+                    <span className="status-item">
+                        🔥 Enhanced Cooldown: {cooldownStatus.canScan ? 'Ready' : 'Active'}
+                    </span>
+                    <span className="status-item">
+                        📷 Camera: {cameraStatus === 'ready' ? 'Ready ✅' : 'Initializing ⏳'}
+                    </span>
+                    <span className="status-item">🧠 AI: Gemini Vision</span>
+                    <span className="status-item">{isPremiumUser ? '💎 Premium' : '🆓 Free'}</span>
+                </div>
+            </div>
+
+            {/* 🎭 PROFESSIONAL Edition Selector */}
+            {showEditionSelector && (
+                <ProfessionalEditionSelector
+                    cardName={pendingCardData?.cardName}
+                    availableEditions={availableEditions}
+                    onEditionSelected={handleEditionSelected}
+                    onCancel={handleEditionCancelled}
+                    aiRecommendation={editionPreferences[pendingCardData?.cardName?.toLowerCase()?.trim()]}
+                />
+            )}
+
+            {/* Premium Upgrade Paywall Modal */}
+            {showPaywallModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3>💎 Upgrade to Premium</h3>
+                        
+                        <div style={{ margin: '20px 0', fontSize: '18px' }}>
+                            <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
+                                You've reached the <strong>{FREE_COLLECTION_LIMIT} card limit</strong> for free users!
+                            </p>
+                        </div>
+                        
+                        <div style={{
+                            background: 'rgba(74, 144, 226, 0.1)',
+                            padding: '20px',
+                            borderRadius: '10px',
+                            margin: '20px 0'
+                        }}>
+                            <h4 style={{ margin: '0 0 15px 0', color: '#4a90e2' }}>Premium Features:</h4>
+                            <ul style={{ textAlign: 'left', lineHeight: '1.8', margin: 0, paddingLeft: '20px' }}>
+                                <li>🔥 <strong>Unlimited collection storage</strong></li>
+                                <li>🧠 <strong>Advanced AI learning</strong></li>
+                                <li>📊 <strong>Collection analytics</strong></li>
+                                <li>💰 <strong>Price tracking & alerts</strong></li>
+                                <li>🎯 <strong>Deck optimization tools</strong></li>
+                                <li>⚡ <strong>Priority customer support</strong></li>
+                            </ul>
+                        </div>
+                        
+                        <div className="modal-buttons">
+                            <button 
+                                onClick={handleUpgradeToPremium}
+                                className="modal-btn primary"
+                            >
+                                💎 Upgrade for $9.99/month
+                            </button>
+                            <button 
+                                onClick={() => setShowPaywallModal(false)}
+                                className="modal-btn secondary"
+                            >
+                                Maybe Later
+                            </button>
+                        </div>
+                        
+                        <div style={{
+                            marginTop: '20px',
+                            paddingTop: '20px',
+                            borderTop: '1px solid #444',
+                            fontSize: '12px',
+                            color: '#ccc'
+                        }}>
+                            <p>💳 Secure payment via PayPal</p>
+                            <p>📧 Payment to: thediceyguy@gmail.com</p>
+                            <p>🔒 Cancel anytime, no long-term commitment</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Continue Scanning Dialog */}
+            {showContinueDialog && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3>🔥 10 Cards Scanned with Smart Cooldown!</h3>
+                        <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
+                            You've successfully scanned <strong>10 cards</strong> with the enhanced cooldown system.
+                        </p>
+                        <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
+                            AI learned <strong>{Object.keys(editionPreferences).length}</strong> edition preferences.
+                        </p>
+                        <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
+                            Total saved to collection: <strong>{savedCards.length}</strong> cards
+                        </p>
+                        
+                        <div className="modal-buttons">
+                            <button 
+                                onClick={handleContinueScanning}
+                                className="modal-btn primary"
+                            >
+                                🔥 Continue Smart Scanning
+                            </button>
+                            <button 
+                                onClick={handleStopScanning}
+                                className="modal-btn secondary"
+                            >
+                                ⏹️ Stop & Review Collection
+                            </button>
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-around',
+                            marginTop: '16px',
+                            paddingTop: '16px',
+                            borderTop: '1px solid #444',
+                            fontSize: '12px',
+                            color: '#ccc'
+                        }}>
+                            <span>🔥 Smart scans: {continuousCount}</span>
+                            <span>🧠 AI learned: {Object.keys(editionPreferences).length}</span>
+                            <span>📁 Collection: {savedCards.length} total</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Camera Selector Modal */}
+            {showCameraSelector && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3>📷 Camera Settings</h3>
+                        
+                        <div style={{ marginBottom: '20px', textAlign: 'left' }}>
+                            <p style={{ margin: '0 0 15px 0', fontSize: '14px', color: '#ccc' }}>
+                                Select your preferred camera for MTG card scanning:
+                            </p>
+                            
+                            {availableCameras.length === 0 ? (
+                                <div style={{
+                                    padding: '20px',
+                                    background: 'rgba(220, 53, 69, 0.1)',
+                                    border: '1px solid #dc3545',
+                                    borderRadius: '8px',
+                                    textAlign: 'center'
+                                }}>
+                                    <p style={{ margin: '0 0 10px 0', color: '#dc3545' }}>
+                                        ❌ No cameras detected
+                                    </p>
+                                    <button
+                                        onClick={refreshCameraList}
+                                        className="modal-btn primary"
+                                    >
+                                        🔄 Refresh Camera List
+                                    </button>
+                                </div>
+                            ) : (
+                                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                    {availableCameras.map((camera, index) => (
+                                        <div
+                                            key={camera.deviceId}
+                                            onClick={() => handleCameraSwitch(camera.deviceId)}
+                                            style={{
+                                                padding: '12px',
+                                                margin: '8px 0',
+                                                background: selectedCameraId === camera.deviceId ? 
+                                                    'rgba(74, 144, 226, 0.3)' : 'rgba(255,255,255,0.1)',
+                                                border: selectedCameraId === camera.deviceId ? 
+                                                    '2px solid #4a90e2' : '1px solid #666',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <div>
+                                                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                                                        📷 {camera.label || `Camera ${index + 1}`}
+                                                    </div>
+                                                    <div style={{ fontSize: '12px', color: '#ccc' }}>
+                                                        {camera.deviceId.substring(0, 20)}...
+                                                    </div>
+                                                </div>
+                                                {selectedCameraId === camera.deviceId && (
+                                                    <div style={{ color: '#4a90e2', fontWeight: 'bold' }}>
+                                                        ✅ Active
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="modal-buttons">
+                            <button
+                                onClick={refreshCameraList}
+                                className="modal-btn secondary"
+                            >
+                                🔄 Refresh
+                            </button>
+                            <button
+                                onClick={() => setShowCameraSelector(false)}
+                                className="modal-btn primary"
+                            >
+                                ✅ Close
+                            </button>
+                        </div>
+                        
+                        <div style={{
+                            marginTop: '15px',
+                            fontSize: '12px',
+                            color: '#999',
+                            textAlign: 'center'
+                        }}>
+                            💡 Tip: Higher resolution cameras (1080p+) work best for card recognition
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

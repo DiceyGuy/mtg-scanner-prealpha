@@ -2,7 +2,7 @@
   "name": "mtg-scanner",
   "version": "1.0.0",
   "description": "MTG Scanner Pro - AI-powered card recognition",
-  "homepage": "https://mtgscanner.com",
+  "homepage": "/",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",

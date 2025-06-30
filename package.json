@@ -1,12 +1,8 @@
 {
   "name": "mtg-scanner-pro",
   "version": "1.0.0",
-  "description": "MTG Scanner Pro - Live and Working",
-  "main": "index.html",
+  "description": "MTG Scanner Pro - Live Website",
   "scripts": {
-    "build": "echo 'Static build ready' && exit 0"
-  },
-  "engines": {
-    "node": "18.x"
+    "build": "mkdir -p dist && cp index.html dist/ && echo 'Build complete'"
   }
 }

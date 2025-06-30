@@ -1,23 +1,28 @@
 {
   "name": "mtg-scanner-pro",
   "version": "1.0.0",
-  "description": "MTG Scanner Pro - AI-powered Magic: The Gathering card recognition",
-  "homepage": ".",
-  "private": true,
+  "description": "AI-powered MTG card scanner with 98% accuracy",
+  "main": "src/index.js",
+  "homepage": "https://mtg-scanner-prealpha.vercel.app",
   "engines": {
-    "node": "18.x"
+    "node": "18.x",
+    "npm": "9.x"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "dev": "react-scripts start"
   },
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "react-scripts": "^5.0.1",
+    "web-vitals": "^3.3.2"
   },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "CI=false npx react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
   },
   "eslintConfig": {
     "extends": [
@@ -36,8 +41,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "devDependencies": {
-    "cross-env": "^7.0.3"
   }
 }

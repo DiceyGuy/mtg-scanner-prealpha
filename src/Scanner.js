@@ -1,9 +1,218 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-// 🔥 ULTIMATE MTG SCANNER PRO - PRODUCTION READY
-// Combines all advanced features: smart cooldowns, edition selection, card art, PayPal monetization
+// 🧠 GEMINI VISION SERVICE - PRODUCTION READY
+class GeminiVisionService {
+    constructor() {
+        this.geminiApiKey = 'AIzaSyBtqyUy1X3BdNtUAW88QZWbtqI39MbUDdk'; // Your working API key
+        this.geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+        this.lastApiCall = 0;
+        this.rateLimitDelay = 3000; // 3 seconds between calls
+        this.consecutiveErrors = 0;
+        
+        console.log('🧠 Gemini Vision Service initialized with operative camera');
+    }
 
-// 🧠 ENHANCED SMART COOLDOWN SYSTEM - BURST THEN PAUSE PATTERN
+    async processVideoFrame(videoElement) {
+        const startTime = performance.now();
+        
+        try {
+            // Rate limiting
+            const now = Date.now();
+            const timeSinceLastCall = now - this.lastApiCall;
+            if (timeSinceLastCall < this.rateLimitDelay) {
+                const waitTime = this.rateLimitDelay - timeSinceLastCall;
+                console.log(`⏳ Rate limiting: waiting ${waitTime}ms`);
+                throw new Error(`Rate limited - wait ${Math.ceil(waitTime/1000)}s`);
+            }
+            this.lastApiCall = Date.now();
+
+            // Capture frame from video
+            const frameData = this.captureFrame(videoElement);
+            const imageBase64 = frameData.canvas.toDataURL('image/jpeg', 0.8);
+            const base64Data = imageBase64.split(',')[1];
+
+            // Call Gemini API
+            const result = await this.callGeminiAPI(base64Data);
+            
+            if (result.hasCard) {
+                this.consecutiveErrors = 0;
+                
+                // Enhance with Scryfall data
+                const enhancedResult = await this.enhanceWithScryfall(result);
+                
+                const processingTime = Math.round(performance.now() - startTime);
+                return {
+                    ...enhancedResult,
+                    processingTime,
+                    timestamp: new Date().toISOString()
+                };
+            }
+            
+            return result;
+            
+        } catch (error) {
+            this.consecutiveErrors++;
+            console.error('❌ Vision processing error:', error);
+            
+            const processingTime = Math.round(performance.now() - startTime);
+            return {
+                hasCard: false,
+                message: `Scanner: ${error.message}`,
+                confidence: 0,
+                processingTime,
+                timestamp: new Date().toISOString()
+            };
+        }
+    }
+
+    captureFrame(videoElement) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = videoElement.videoWidth;
+        canvas.height = videoElement.videoHeight;
+        
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(videoElement, 0, 0);
+        
+        return { canvas, width: canvas.width, height: canvas.height };
+    }
+
+    async callGeminiAPI(base64Data) {
+        const prompt = `Analyze this image for Magic: The Gathering cards. 
+
+RULES:
+1. Only identify clear, well-lit MTG cards
+2. Must be 90%+ confident to respond
+3. Focus on the card name in the title area
+
+If you see a clear MTG card, respond EXACTLY like this:
+CARD_NAME: [exact name]
+CONFIDENCE: [90-100]
+TYPE: [card type]
+MANA_COST: [if visible]
+
+If no clear MTG card: "NO_MTG_CARD"`;
+
+        const requestBody = {
+            contents: [{
+                parts: [
+                    { text: prompt },
+                    {
+                        inline_data: {
+                            mime_type: "image/jpeg",
+                            data: base64Data
+                        }
+                    }
+                ]
+            }],
+            generationConfig: {
+                temperature: 0.1,
+                topK: 1,
+                topP: 0.8,
+                maxOutputTokens: 200
+            }
+        };
+
+        const response = await fetch(`${this.geminiApiUrl}?key=${this.geminiApiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            if (response.status === 429) {
+                this.rateLimitDelay = Math.min(this.rateLimitDelay * 1.5, 15000);
+                throw new Error(`Rate limited - reducing scan speed`);
+            }
+            throw new Error(`Gemini API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const responseText = data.candidates[0]?.content?.parts[0]?.text || '';
+        
+        return this.parseGeminiResponse(responseText);
+    }
+
+    parseGeminiResponse(responseText) {
+        if (!responseText || responseText.includes('NO_MTG_CARD')) {
+            return {
+                hasCard: false,
+                message: 'No MTG card detected',
+                confidence: 0
+            };
+        }
+
+        const lines = responseText.split('\n');
+        let cardName = '';
+        let confidence = 0;
+        let cardType = '';
+        let manaCost = '';
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('CARD_NAME:')) {
+                cardName = trimmed.replace('CARD_NAME:', '').trim();
+            } else if (trimmed.startsWith('CONFIDENCE:')) {
+                confidence = parseInt(trimmed.replace('CONFIDENCE:', '').trim()) || 0;
+            } else if (trimmed.startsWith('TYPE:')) {
+                cardType = trimmed.replace('TYPE:', '').trim();
+            } else if (trimmed.startsWith('MANA_COST:')) {
+                manaCost = trimmed.replace('MANA_COST:', '').trim();
+            }
+        }
+
+        if (!cardName || cardName.length < 3 || confidence < 85) {
+            return {
+                hasCard: false,
+                message: confidence < 85 ? `Low confidence: ${confidence}%` : 'Invalid card name',
+                confidence: confidence
+            };
+        }
+
+        return {
+            hasCard: true,
+            cardName,
+            confidence,
+            cardType,
+            manaCost,
+            method: 'gemini_vision'
+        };
+    }
+
+    async enhanceWithScryfall(result) {
+        try {
+            const encodedName = encodeURIComponent(result.cardName);
+            const response = await fetch(`https://api.scryfall.com/cards/named?exact=${encodedName}`);
+            
+            if (response.ok) {
+                const scryfallCard = await response.json();
+                return {
+                    ...result,
+                    cardType: scryfallCard.type_line,
+                    manaCost: scryfallCard.mana_cost || '',
+                    setInfo: scryfallCard.set_name,
+                    rarity: scryfallCard.rarity,
+                    scryfallId: scryfallCard.id,
+                    scryfallUri: scryfallCard.scryfall_uri,
+                    imageUri: scryfallCard.image_uris?.normal,
+                    prices: scryfallCard.prices,
+                    colors: scryfallCard.colors || [],
+                    setCode: scryfallCard.set,
+                    collectorNumber: scryfallCard.collector_number,
+                    isVerified: true
+                };
+            }
+        } catch (error) {
+            console.log('⚠️ Scryfall enhancement failed:', error.message);
+        }
+        
+        return result;
+    }
+}
+
+// 🔥 SMART COOLDOWN SYSTEM - BURST THEN PAUSE
 class UltimateSmartCooldown {
     constructor() {
         this.lastDetectedCard = null;
@@ -13,50 +222,39 @@ class UltimateSmartCooldown {
         this.detectionBuffer = [];
         this.isEditionSelectorOpen = false;
         
-        // 🔥 BURST SCAN PATTERN: Fast initial → Long cooldown after success
-        this.BURST_SCAN_INTERVAL = 1500;      // 1.5s for initial fast scanning
-        this.SAME_CARD_COOLDOWN = 12000;      // 12s after successful detection
+        // Optimized timing for real camera
+        this.BURST_SCAN_INTERVAL = 2000;      // 2s for fast scanning
+        this.SAME_CARD_COOLDOWN = 10000;      // 10s after detection
         this.DETECTION_STABILITY = 2;         // Need 2 consistent detections
         this.MAX_CONSECUTIVE = 3;             // Max before long pause
-        this.LONG_PAUSE_DURATION = 20000;    // 20s pause after max consecutive
+        this.LONG_PAUSE_DURATION = 15000;    // 15s pause
         
         this.isLongPauseActive = false;
         this.longPauseStartTime = 0;
-        this.currentMode = 'burst'; // 'burst' or 'cooldown'
+        this.currentMode = 'burst';
     }
 
     shouldScan(cardName = null) {
         const now = Date.now();
         
-        // Don't scan if edition selector is open
-        if (this.isEditionSelectorOpen) {
-            return false;
-        }
+        if (this.isEditionSelectorOpen) return false;
         
-        // Check long pause
         if (this.isLongPauseActive) {
             const pauseRemaining = this.LONG_PAUSE_DURATION - (now - this.longPauseStartTime);
-            if (pauseRemaining > 0) {
-                return false;
-            } else {
+            if (pauseRemaining > 0) return false;
+            else {
                 this.isLongPauseActive = false;
                 this.consecutiveDetections = 0;
                 this.currentMode = 'burst';
             }
         }
         
-        // Smart interval based on mode
         const interval = this.currentMode === 'burst' ? this.BURST_SCAN_INTERVAL : this.SAME_CARD_COOLDOWN;
-        if (now - this.lastApiCall < interval) {
-            return false;
-        }
+        if (now - this.lastApiCall < interval) return false;
         
-        // Same card extended cooldown
         if (cardName && cardName === this.lastDetectedCard && this.currentMode === 'cooldown') {
             const timeSinceLastDetection = now - this.lastDetectionTime;
-            if (timeSinceLastDetection < this.SAME_CARD_COOLDOWN) {
-                return false;
-            }
+            if (timeSinceLastDetection < this.SAME_CARD_COOLDOWN) return false;
         }
         
         return true;
@@ -89,7 +287,7 @@ class UltimateSmartCooldown {
         this.lastDetectionTime = now;
         this.lastApiCall = now;
         this.detectionBuffer = [];
-        this.currentMode = 'cooldown'; // Switch to cooldown mode after successful detection
+        this.currentMode = 'cooldown';
         
         if (this.consecutiveDetections >= this.MAX_CONSECUTIVE) {
             this.isLongPauseActive = true;
@@ -113,7 +311,6 @@ class UltimateSmartCooldown {
 
     getCooldownStatus() {
         const now = Date.now();
-        
         let longPauseRemaining = 0;
         if (this.isLongPauseActive) {
             longPauseRemaining = Math.max(0, this.LONG_PAUSE_DURATION - (now - this.longPauseStartTime));
@@ -124,10 +321,8 @@ class UltimateSmartCooldown {
         return {
             mode: this.currentMode,
             nextScanIn: Math.max(0, nextInterval - (now - this.lastApiCall)),
-            sameCardCooldown: this.lastDetectedCard ? Math.max(0, this.SAME_CARD_COOLDOWN - (now - this.lastDetectionTime)) : 0,
             consecutiveDetections: this.consecutiveDetections,
             longPauseRemaining,
-            isEditionSelectorOpen: this.isEditionSelectorOpen,
             canScan: this.shouldScan(this.lastDetectedCard),
             detectionBufferSize: this.detectionBuffer.length,
             stabilityRequired: this.DETECTION_STABILITY
@@ -135,149 +330,62 @@ class UltimateSmartCooldown {
     }
 }
 
-// 🧠 AI LEARNING SYSTEM FOR EDITION PREFERENCES
-class EditionLearningSystem {
-    constructor() {
-        this.preferences = this.loadPreferences();
-    }
-
-    loadPreferences() {
-        try {
-            const saved = localStorage.getItem('mtg_edition_preferences');
-            return saved ? JSON.parse(saved) : {};
-        } catch {
-            return {};
-        }
-    }
-
-    savePreferences() {
-        localStorage.setItem('mtg_edition_preferences', JSON.stringify(this.preferences));
-    }
-
-    learnPreference(cardName, selectedEdition) {
-        const cardKey = cardName.toLowerCase().trim();
-        this.preferences[cardKey] = {
-            setCode: selectedEdition.set,
-            setName: selectedEdition.set_name,
-            learnedAt: new Date().toISOString(),
-            useCount: (this.preferences[cardKey]?.useCount || 0) + 1
-        };
-        this.savePreferences();
-    }
-
-    getRecommendation(cardName) {
-        const cardKey = cardName.toLowerCase().trim();
-        return this.preferences[cardKey];
-    }
-
-    sortEditionsByPreference(cardName, editions) {
-        const recommendation = this.getRecommendation(cardName);
-        if (!recommendation) return editions;
-
-        return editions.sort((a, b) => {
-            if (a.set === recommendation.setCode) return -1;
-            if (b.set === recommendation.setCode) return 1;
-            return 0;
-        });
-    }
-}
-
-// 🎭 EDITION SELECTION MODAL COMPONENT
-const EditionSelector = ({ 
-    isOpen, 
-    cardName, 
-    editions, 
-    onSelect, 
-    onCancel, 
-    aiRecommendation 
-}) => {
+// 🎭 EDITION SELECTOR COMPONENT
+const EditionSelector = ({ isOpen, cardName, editions, onSelect, onCancel }) => {
     if (!isOpen) return null;
 
     return (
         <div style={{
             position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
             background: 'rgba(0,0,0,0.9)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', zIndex: 10000,
-            animation: 'fadeIn 0.3s ease-out'
+            alignItems: 'center', justifyContent: 'center', zIndex: 10000
         }}>
             <div style={{
                 background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f1419 100%)',
                 border: '2px solid #4a90e2', borderRadius: '16px', padding: '32px',
                 maxWidth: '600px', width: '90%', maxHeight: '80vh',
-                color: 'white', animation: 'slideIn 0.3s ease-out'
+                color: 'white'
             }}>
-                <h3 style={{ 
-                    color: '#4a90e2', marginBottom: '20px', textAlign: 'center',
-                    fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
-                }}>
+                <h3 style={{ color: '#4a90e2', marginBottom: '20px', textAlign: 'center' }}>
                     🎭 Multiple Editions Found
                 </h3>
                 
-                <p style={{ 
-                    marginBottom: '24px', color: '#94a3b8', textAlign: 'center', fontSize: '16px'
-                }}>
+                <p style={{ marginBottom: '24px', color: '#94a3b8', textAlign: 'center' }}>
                     Choose the correct edition for <strong style={{ color: '#4a90e2' }}>{cardName}</strong>
                 </p>
                 
-                <div style={{ 
-                    maxHeight: '400px', overflowY: 'auto', marginBottom: '24px',
-                    padding: '8px'
-                }}>
-                    {editions.map((edition, index) => {
-                        const isRecommended = aiRecommendation && edition.set === aiRecommendation.setCode;
-                        
-                        return (
-                            <div key={index} onClick={() => onSelect(edition)}
-                                style={{
-                                    padding: '16px', margin: '12px 0',
-                                    background: isRecommended ? 
-                                        'linear-gradient(135deg, rgba(74, 144, 226, 0.2), rgba(74, 144, 226, 0.1))' :
-                                        'rgba(255, 255, 255, 0.05)',
-                                    border: isRecommended ? 
-                                        '2px solid #4a90e2' : 
-                                        '1px solid rgba(255, 255, 255, 0.1)',
-                                    borderRadius: '12px', cursor: 'pointer', textAlign: 'left',
-                                    transition: 'all 0.2s ease',
-                                    position: 'relative'
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isRecommended) {
-                                        e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-                                        e.target.style.transform = 'translateY(-2px)';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isRecommended) {
-                                        e.target.style.background = 'rgba(255, 255, 255, 0.05)';
-                                        e.target.style.transform = 'translateY(0)';
-                                    }
-                                }}>
-                                
-                                {isRecommended && (
-                                    <div style={{
-                                        position: 'absolute', top: '8px', right: '12px',
-                                        background: 'linear-gradient(45deg, #4a90e2, #64b5f6)',
-                                        color: 'white', padding: '4px 8px', borderRadius: '12px',
-                                        fontSize: '10px', fontWeight: 'bold'
-                                    }}>
-                                        🧠 AI PICK
-                                    </div>
-                                )}
-                                
-                                <div style={{ fontWeight: '600', marginBottom: '8px', fontSize: '16px' }}>
-                                    {edition.set_name}
-                                </div>
-                                
-                                <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.4' }}>
-                                    <div><strong>Set:</strong> {edition.set.toUpperCase()}</div>
-                                    <div><strong>Released:</strong> {edition.released_at}</div>
-                                    {edition.prices?.usd && (
-                                        <div><strong>Price:</strong> ${edition.prices.usd}</div>
-                                    )}
-                                </div>
+                <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '24px' }}>
+                    {editions.map((edition, index) => (
+                        <div key={index} onClick={() => onSelect(edition)}
+                            style={{
+                                padding: '16px', margin: '12px 0',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: '12px', cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.background = 'rgba(74, 144, 226, 0.1)';
+                                e.target.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+                                e.target.style.transform = 'translateY(0)';
+                            }}>
+                            
+                            <div style={{ fontWeight: '600', marginBottom: '8px', fontSize: '16px' }}>
+                                {edition.set_name}
                             </div>
-                        );
-                    })}
+                            
+                            <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.4' }}>
+                                <div><strong>Set:</strong> {edition.set.toUpperCase()}</div>
+                                <div><strong>Released:</strong> {edition.released_at}</div>
+                                {edition.prices?.usd && (
+                                    <div><strong>Price:</strong> ${edition.prices.usd}</div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
                 </div>
                 
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
@@ -285,16 +393,7 @@ const EditionSelector = ({
                         style={{
                             padding: '12px 24px', background: 'transparent',
                             border: '2px solid #666', color: '#94a3b8',
-                            borderRadius: '8px', cursor: 'pointer', fontSize: '14px',
-                            fontWeight: '600', transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.target.style.borderColor = '#4a90e2';
-                            e.target.style.color = '#4a90e2';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.borderColor = '#666';
-                            e.target.style.color = '#94a3b8';
+                            borderRadius: '8px', cursor: 'pointer'
                         }}>
                         Skip Selection
                     </button>
@@ -304,253 +403,24 @@ const EditionSelector = ({
     );
 };
 
-// 💰 PREMIUM PAYWALL MODAL
-const PremiumPaywallModal = ({ isOpen, onClose, onUpgrade, cardsScanned, limit }) => {
-    if (!isOpen) return null;
+// 📷 CAMERA STATUS INDICATOR
+const CameraStatus = ({ status, error }) => (
+    <div style={{
+        position: 'absolute', bottom: '10px', left: '10px',
+        background: 'rgba(0,0,0,0.8)', color: 'white',
+        padding: '8px 12px', borderRadius: '6px',
+        fontSize: '12px', fontWeight: '500',
+        border: '1px solid #4a90e2'
+    }}>
+        📷 {status === 'ready' ? 'Camera Ready ✅' : 
+             status === 'requesting' ? 'Initializing... ⏳' : 
+             status === 'error' ? `Error: ${error?.message || 'Unknown'} ❌` : 
+             'Starting... 🔄'}
+    </div>
+);
 
-    return (
-        <div style={{
-            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-            background: 'rgba(0,0,0,0.9)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', zIndex: 10000,
-            animation: 'fadeIn 0.3s ease-out'
-        }}>
-            <div style={{
-                background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f1419 100%)',
-                border: '2px solid #4a90e2', borderRadius: '16px', padding: '32px',
-                maxWidth: '500px', width: '90%', color: 'white',
-                animation: 'slideIn 0.3s ease-out', textAlign: 'center'
-            }}>
-                <h3 style={{ 
-                    color: '#4a90e2', marginBottom: '20px', fontSize: '28px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
-                }}>
-                    💎 Upgrade to Premium
-                </h3>
-                
-                <div style={{
-                    background: 'rgba(220, 53, 69, 0.1)', border: '1px solid #dc3545',
-                    borderRadius: '12px', padding: '20px', marginBottom: '24px'
-                }}>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#dc3545', marginBottom: '8px' }}>
-                        🚫 Free Limit Reached
-                    </div>
-                    <div style={{ color: '#94a3b8' }}>
-                        You've scanned <strong>{cardsScanned}</strong> cards (limit: {limit})
-                    </div>
-                </div>
-                
-                <div style={{
-                    background: 'rgba(74, 144, 226, 0.1)', padding: '24px',
-                    borderRadius: '12px', margin: '24px 0', textAlign: 'left'
-                }}>
-                    <h4 style={{ margin: '0 0 16px 0', color: '#4a90e2', textAlign: 'center' }}>
-                        🔥 Premium Features:
-                    </h4>
-                    <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: '1.8' }}>
-                        <li><strong>Unlimited scanning</strong> and collection storage</li>
-                        <li><strong>Advanced AI learning</strong> for edition preferences</li>
-                        <li><strong>Collection analytics</strong> and insights</li>
-                        <li><strong>Price tracking</strong> and market alerts</li>
-                        <li><strong>Priority support</strong> and early access features</li>
-                        <li><strong>Export to all platforms</strong> (Moxfield, EDHREC, etc.)</li>
-                    </ul>
-                </div>
-                
-                <div style={{
-                    background: 'linear-gradient(45deg, #4a90e2, #64b5f6)',
-                    padding: '20px', borderRadius: '12px', marginBottom: '24px'
-                }}>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
-                        Only $9.99/month
-                    </div>
-                    <div style={{ fontSize: '14px', opacity: 0.9 }}>
-                        Cancel anytime • 7-day money-back guarantee
-                    </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                    <button onClick={onUpgrade}
-                        style={{
-                            padding: '16px 32px', background: 'linear-gradient(45deg, #22c55e, #16a34a)',
-                            border: 'none', color: 'white', borderRadius: '8px',
-                            cursor: 'pointer', fontSize: '16px', fontWeight: 'bold',
-                            transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.target.style.transform = 'scale(1.05)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.transform = 'scale(1)';
-                        }}>
-                        💎 Upgrade to Premium
-                    </button>
-                    <button onClick={onClose}
-                        style={{
-                            padding: '16px 24px', background: 'transparent',
-                            border: '2px solid #666', color: '#94a3b8',
-                            borderRadius: '8px', cursor: 'pointer', fontSize: '14px'
-                        }}>
-                        Maybe Later
-                    </button>
-                </div>
-                
-                <div style={{ 
-                    fontSize: '12px', color: '#666', marginTop: '20px',
-                    borderTop: '1px solid #333', paddingTop: '16px'
-                }}>
-                    💳 Secure payment via PayPal • No long-term commitment
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// 🖼️ CARD IMAGE COMPONENT WITH LOADING STATES
-const CardImage = ({ card, size = 'medium' }) => {
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
-    
-    const sizes = {
-        small: { width: '60px', height: '84px' },
-        medium: { width: '120px', height: '168px' },
-        large: { width: '180px', height: '252px' }
-    };
-    
-    const currentSize = sizes[size];
-    
-    const imageUrl = card.scryfallImageUrl || card.imageUri || 
-        `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(card.cardName)}&format=image&version=normal`;
-    
-    if (error) {
-        return (
-            <div style={{
-                ...currentSize, background: 'linear-gradient(135deg, #333, #444)',
-                borderRadius: '8px', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                border: '1px solid #666', color: '#999', fontSize: '10px', textAlign: 'center'
-            }}>
-                <div style={{ fontSize: '24px', marginBottom: '4px' }}>🃏</div>
-                <div>No Image</div>
-            </div>
-        );
-    }
-    
-    return (
-        <div style={{ position: 'relative', ...currentSize }}>
-            {loading && (
-                <div style={{
-                    position: 'absolute', top: 0, left: 0, ...currentSize,
-                    background: 'linear-gradient(135deg, #4a90e2, #64b5f6)',
-                    borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'white', fontSize: '12px'
-                }}>
-                    <div style={{ 
-                        animation: 'spin 1s linear infinite',
-                        fontSize: '20px'
-                    }}>⟳</div>
-                </div>
-            )}
-            <img 
-                src={imageUrl}
-                alt={card.cardName}
-                style={{
-                    ...currentSize, borderRadius: '8px', objectFit: 'cover',
-                    border: '1px solid #4a90e2', opacity: loading ? 0 : 1,
-                    transition: 'opacity 0.3s ease'
-                }}
-                onLoad={() => setLoading(false)}
-                onError={() => {
-                    setLoading(false);
-                    setError(true);
-                }}
-            />
-        </div>
-    );
-};
-
-// 📊 PREMIUM PROGRESS INDICATOR
-const PremiumProgressIndicator = ({ current, limit, isPremium }) => {
-    if (isPremium) {
-        return (
-            <div style={{
-                background: 'linear-gradient(45deg, #22c55e, #16a34a)',
-                padding: '12px 20px', borderRadius: '8px', marginBottom: '20px',
-                display: 'flex', alignItems: 'center', gap: '12px'
-            }}>
-                <div style={{ fontSize: '20px' }}>💎</div>
-                <div>
-                    <div style={{ fontWeight: 'bold', color: 'white' }}>Premium Active</div>
-                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>
-                        Unlimited scanning • {current} cards in collection
-                    </div>
-                </div>
-            </div>
-        );
-    }
-    
-    const percentage = (current / limit) * 100;
-    const isNearLimit = percentage >= 80;
-    const isAtLimit = current >= limit;
-    
-    return (
-        <div style={{
-            background: isAtLimit ? 'rgba(220, 53, 69, 0.1)' : 
-                      isNearLimit ? 'rgba(251, 191, 36, 0.1)' : 'rgba(74, 144, 226, 0.1)',
-            border: `1px solid ${isAtLimit ? '#dc3545' : 
-                              isNearLimit ? '#fbbf24' : '#4a90e2'}`,
-            borderRadius: '12px', padding: '16px', marginBottom: '20px'
-        }}>
-            <div style={{ 
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                marginBottom: '12px'
-            }}>
-                <div>
-                    <span style={{ 
-                        color: isAtLimit ? '#dc3545' : isNearLimit ? '#fbbf24' : '#4a90e2',
-                        fontWeight: 'bold'
-                    }}>
-                        {isAtLimit ? '🚫' : isNearLimit ? '⚠️' : '📊'} Free Tier Progress
-                    </span>
-                </div>
-                <div style={{ 
-                    color: isAtLimit ? '#dc3545' : isNearLimit ? '#fbbf24' : '#4a90e2',
-                    fontWeight: 'bold'
-                }}>
-                    {current} / {limit}
-                </div>
-            </div>
-            
-            <div style={{
-                width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)',
-                borderRadius: '4px', overflow: 'hidden'
-            }}>
-                <div style={{
-                    width: `${Math.min(percentage, 100)}%`, height: '100%',
-                    background: isAtLimit ? 'linear-gradient(90deg, #dc3545, #b91c1c)' :
-                               isNearLimit ? 'linear-gradient(90deg, #fbbf24, #f59e0b)' :
-                               'linear-gradient(90deg, #4a90e2, #64b5f6)',
-                    borderRadius: '4px', transition: 'width 0.3s ease'
-                }}></div>
-            </div>
-            
-            {isNearLimit && (
-                <div style={{ 
-                    fontSize: '12px', color: '#94a3b8', marginTop: '8px',
-                    textAlign: 'center'
-                }}>
-                    {isAtLimit ? 
-                        'Upgrade to Premium for unlimited scanning!' :
-                        `${limit - current} scans remaining before limit`
-                    }
-                </div>
-            )}
-        </div>
-    );
-};
-
-// 🔥 ENHANCED COOLDOWN STATUS DISPLAY
-const EnhancedCooldownStatus = ({ cooldownStatus, isVisible }) => {
+// 🔥 ENHANCED COOLDOWN STATUS
+const CooldownStatus = ({ cooldownStatus, isVisible }) => {
     if (!isVisible || !cooldownStatus) return null;
 
     return (
@@ -561,7 +431,7 @@ const EnhancedCooldownStatus = ({ cooldownStatus, isVisible }) => {
             border: '1px solid #4a90e2', minWidth: '200px', zIndex: 1000
         }}>
             <div style={{color: '#4a90e2', fontWeight: 'bold', marginBottom: '8px', textAlign: 'center'}}>
-                🔥 SMART SCANNER STATUS
+                🔥 OPERATIVE SCANNER
             </div>
             
             <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '4px'}}>
@@ -586,18 +456,6 @@ const EnhancedCooldownStatus = ({ cooldownStatus, isVisible }) => {
                 </span>
             </div>
             
-            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '8px'}}>
-                <span>Consecutive:</span>
-                <span style={{color: '#64b5f6'}}>{cooldownStatus.consecutiveDetections}/3</span>
-            </div>
-            
-            {cooldownStatus.longPauseRemaining > 0 && (
-                <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '8px'}}>
-                    <span>Long Pause:</span>
-                    <span style={{color: '#ffc107'}}>{Math.ceil(cooldownStatus.longPauseRemaining / 1000)}s</span>
-                </div>
-            )}
-            
             <div style={{
                 marginTop: '8px', padding: '6px', 
                 background: cooldownStatus.canScan ? 'rgba(34, 197, 94, 0.3)' : 'rgba(220, 53, 69, 0.3)',
@@ -609,7 +467,7 @@ const EnhancedCooldownStatus = ({ cooldownStatus, isVisible }) => {
     );
 };
 
-// 🎯 TOAST NOTIFICATION SYSTEM
+// 🎯 TOAST NOTIFICATIONS
 const showToast = (message, type = 'info', duration = 3000) => {
     const existingToasts = document.querySelectorAll('.toast-notification');
     existingToasts.forEach(toast => toast.remove());
@@ -621,31 +479,14 @@ const showToast = (message, type = 'info', duration = 3000) => {
         background: ${type === 'success' ? '#22c55e' : type === 'error' ? '#dc3545' : '#4a90e2'};
         color: white; padding: 16px 24px; border-radius: 8px;
         font-weight: 600; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        animation: slideToastIn 0.3s ease-out;
-        max-width: 300px; font-size: 14px;
+        animation: slideIn 0.3s ease-out; max-width: 300px; font-size: 14px;
     `;
     
     const style = document.createElement('style');
     style.textContent = `
-        @keyframes slideToastIn {
+        @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideToastOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes slideIn {
-            from { transform: translateY(-20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
         }
     `;
     document.head.appendChild(style);
@@ -654,136 +495,159 @@ const showToast = (message, type = 'info', duration = 3000) => {
     document.body.appendChild(toast);
     
     setTimeout(() => {
-        toast.style.animation = 'slideToastOut 0.3s ease-out';
-        setTimeout(() => {
-            if (toast.parentNode) toast.parentNode.removeChild(toast);
-        }, 300);
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
     }, duration);
 };
 
-// 🔥 MAIN ULTIMATE SCANNER COMPONENT
-const UltimateMTGScanner = () => {
+// 🔥 MAIN SCANNER COMPONENT WITH OPERATIVE CAMERA
+const MTGScannerPro = () => {
     // Core scanning state
     const [isScanning, setIsScanning] = useState(false);
     const [scanResult, setScanResult] = useState(null);
     const [cameraStatus, setCameraStatus] = useState('initializing');
+    const [cameraError, setCameraError] = useState(null);
     const [currentCard, setCurrentCard] = useState(null);
     const [scanMode, setScanMode] = useState('continuous');
     
-    // Collection and premium state
+    // Collection state
     const [savedCards, setSavedCards] = useState([]);
-    const [isPremiumUser, setIsPremiumUser] = useState(false);
-    const [showPaywallModal, setShowPaywallModal] = useState(false);
-    const FREE_COLLECTION_LIMIT = 100;
+    const [scanHistory, setScanHistory] = useState([]);
     
     // Edition selection state
     const [showEditionSelector, setShowEditionSelector] = useState(false);
     const [availableEditions, setAvailableEditions] = useState([]);
     const [pendingCardData, setPendingCardData] = useState(null);
-    const [aiRecommendation, setAiRecommendation] = useState(null);
     
     // UI state
     const [activeTab, setActiveTab] = useState('scanner');
     const [cooldownStatus, setCooldownStatus] = useState({});
-    const [scanHistory, setScanHistory] = useState([]);
+    const [availableCameras, setAvailableCameras] = useState([]);
+    const [selectedCameraId, setSelectedCameraId] = useState(null);
     
-    // Refs and systems
+    // Refs
     const videoRef = useRef(null);
     const scanIntervalRef = useRef(null);
+    const cameraStreamRef = useRef(null);
+    const visionServiceRef = useRef(new GeminiVisionService());
     const cooldownSystemRef = useRef(new UltimateSmartCooldown());
-    const editionLearningRef = useRef(new EditionLearningSystem());
-    
-    // Mock vision service (replace with your actual Gemini service)
-    const mockVisionService = useRef({
-        processVideoFrame: async (videoElement) => {
-            // Simulate API delay
-            await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-            
-            // Random card detection for demo
-            if (Math.random() > 0.7) {
-                const mockCards = [
-                    'Lightning Bolt', 'Counterspell', 'Sol Ring', 'Birds of Paradise',
-                    'Path to Exile', 'Swords to Plowshares', 'Dark Ritual', 'Giant Growth'
-                ];
-                const randomCard = mockCards[Math.floor(Math.random() * mockCards.length)];
-                
-                return {
-                    hasCard: true,
-                    cardName: randomCard,
-                    confidence: 85 + Math.random() * 13,
-                    cardType: 'Instant',
-                    manaCost: '{R}',
-                    method: 'gemini_vision',
-                    timestamp: new Date().toISOString()
-                };
-            }
-            
-            return {
-                hasCard: false,
-                message: 'No MTG card detected',
-                confidence: 0
-            };
-        }
-    });
 
     // Initialize component
     useEffect(() => {
-        console.log('🚀 Initializing Ultimate MTG Scanner...');
+        console.log('🚀 Initializing MTG Scanner Pro with operative camera...');
         loadSavedData();
-        setupMockCamera();
+        enumerateCameras().then(() => setupCamera());
         
         const cooldownUpdateInterval = setInterval(() => {
             setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
         }, 500);
         
         return () => {
-            console.log('🧹 Cleaning up...');
-            clearInterval(cooldownUpdateInterval);
             cleanup();
+            clearInterval(cooldownUpdateInterval);
         };
     }, []);
 
     const loadSavedData = () => {
         try {
-            const saved = localStorage.getItem('mtg_saved_cards_ultimate');
-            if (saved) {
-                setSavedCards(JSON.parse(saved));
-            }
+            const saved = localStorage.getItem('mtg_saved_cards_pro');
+            if (saved) setSavedCards(JSON.parse(saved));
             
-            const premium = localStorage.getItem('mtg_premium_status');
-            if (premium === 'true') {
-                setIsPremiumUser(true);
-            }
-            
-            const history = localStorage.getItem('mtg_scan_history');
-            if (history) {
-                setScanHistory(JSON.parse(history));
-            }
+            const history = localStorage.getItem('mtg_scan_history_pro');
+            if (history) setScanHistory(JSON.parse(history));
         } catch (error) {
             console.error('❌ Failed to load saved data:', error);
         }
     };
 
-    const setupMockCamera = async () => {
-        setCameraStatus('requesting');
-        
-        // Simulate camera setup delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        setCameraStatus('ready');
-        showToast('📷 Camera ready for MTG scanning!', 'success');
+    // 📷 CAMERA ENUMERATION AND SETUP
+    const enumerateCameras = async () => {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            console.log('📷 Available cameras:', videoDevices.length);
+            setAvailableCameras(videoDevices);
+            
+            // Prioritize Logitech C920 or first available camera
+            const logitechCamera = videoDevices.find(device => 
+                device.label.toLowerCase().includes('logitech') || 
+                device.label.toLowerCase().includes('c920')
+            );
+            
+            if (logitechCamera) {
+                setSelectedCameraId(logitechCamera.deviceId);
+                console.log('✅ Auto-selected Logitech C920');
+            } else if (videoDevices.length > 0) {
+                setSelectedCameraId(videoDevices[0].deviceId);
+                console.log('✅ Auto-selected first camera');
+            }
+        } catch (error) {
+            console.error('❌ Failed to enumerate cameras:', error);
+            setCameraError({ message: 'Failed to detect cameras' });
+        }
     };
 
+    const setupCamera = async (deviceId = null) => {
+        console.log('🎥 Setting up operative camera...');
+        setCameraStatus('requesting');
+        setCameraError(null);
+        
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Camera API not supported');
+            }
+
+            // Stop existing stream
+            if (cameraStreamRef.current) {
+                cameraStreamRef.current.getTracks().forEach(track => track.stop());
+            }
+
+            const useDeviceId = deviceId || selectedCameraId;
+            let constraints = {
+                video: {
+                    deviceId: useDeviceId ? { exact: useDeviceId } : undefined,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    frameRate: { ideal: 30 }
+                },
+                audio: false
+            };
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            cameraStreamRef.current = stream;
+            
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.onloadedmetadata = () => {
+                    videoRef.current.play();
+                    setCameraStatus('ready');
+                    setCameraError(null);
+                    console.log('✅ Operative camera ready:', `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
+                    showToast('📷 Operative camera ready for MTG scanning!', 'success');
+                };
+            }
+        } catch (error) {
+            console.error('❌ Camera setup failed:', error);
+            setCameraStatus('error');
+            setCameraError({
+                message: error.name === 'NotAllowedError' ? 'Camera permission denied' : 
+                         error.name === 'NotFoundError' ? 'No camera found' :
+                         error.name === 'NotReadableError' ? 'Camera is busy' : 'Camera error'
+            });
+            showToast('❌ Camera setup failed', 'error');
+        }
+    };
+
+    // 🔍 SCANNING LOGIC
     const startScanning = () => {
         if (cameraStatus !== 'ready') {
             showToast('❌ Camera not ready', 'error');
             return;
         }
         
-        console.log(`▶️ Starting Ultimate Scanner - ${scanMode} mode...`);
+        console.log(`▶️ Starting operative scanning - ${scanMode} mode...`);
         setIsScanning(true);
         cooldownSystemRef.current.resetCooldowns();
-        setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
         
         scanIntervalRef.current = setInterval(async () => {
             try {
@@ -801,12 +665,17 @@ const UltimateMTGScanner = () => {
                     cooldownSystemRef.current.setEditionSelectorOpen(false);
                 }
 
-                const result = await mockVisionService.current.processVideoFrame(videoRef.current);
+                console.log("🔄 Processing frame with Gemini AI...");
+                const result = await visionServiceRef.current.processVideoFrame(videoRef.current);
                 
                 if (result && result.hasCard && result.confidence >= 85) {
+                    console.log(`🎯 Card detected: ${result.cardName} (${result.confidence}%)`);
+                    
                     const isStable = cooldownSystemRef.current.addDetection(result.cardName, result.confidence);
                     
                     if (isStable) {
+                        console.log('✅ Detection stable, processing...');
+                        
                         cooldownSystemRef.current.recordDetection(result.cardName);
                         setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
                         
@@ -826,57 +695,29 @@ const UltimateMTGScanner = () => {
                 
             } catch (error) {
                 console.error('❌ Scanning error:', error);
-                setScanResult({ hasCard: false, message: 'Scanner error - please try again' });
+                setScanResult({ hasCard: false, message: `Scanner error: ${error.message}` });
             }
         }, 1000);
     };
 
     const handleCardDetection = async (detectedCard) => {
         try {
-            // Add to scan history
             addToScanHistory(detectedCard);
             
-            // Check if at free limit
-            if (!isPremiumUser && savedCards.length >= FREE_COLLECTION_LIMIT) {
-                setShowPaywallModal(true);
-                displayCard(detectedCard);
-                return;
-            }
-            
-            // Mock Scryfall edition lookup
+            // Mock Scryfall edition lookup for demo
             const mockEditions = [
-                {
-                    set: 'lea', set_name: 'Limited Edition Alpha', released_at: '1993-08-05',
-                    prices: { usd: '150.00' }
-                },
-                {
-                    set: 'leb', set_name: 'Limited Edition Beta', released_at: '1993-10-01',
-                    prices: { usd: '75.00' }
-                },
-                {
-                    set: 'dom', set_name: 'Dominaria', released_at: '2018-04-27',
-                    prices: { usd: '2.50' }
-                }
+                { set: 'dom', set_name: 'Dominaria', released_at: '2018-04-27', prices: { usd: '2.50' } },
+                { set: 'lea', set_name: 'Limited Edition Alpha', released_at: '1993-08-05', prices: { usd: '150.00' } },
+                { set: 'leb', set_name: 'Limited Edition Beta', released_at: '1993-10-01', prices: { usd: '75.00' } }
             ];
             
             if (mockEditions.length > 1) {
-                // Sort by AI preference
-                const sortedEditions = editionLearningRef.current.sortEditionsByPreference(
-                    detectedCard.cardName, 
-                    mockEditions
-                );
-                
-                const recommendation = editionLearningRef.current.getRecommendation(detectedCard.cardName);
-                
                 setPendingCardData(detectedCard);
-                setAvailableEditions(sortedEditions);
-                setAiRecommendation(recommendation);
+                setAvailableEditions(mockEditions);
                 setShowEditionSelector(true);
-                
                 setScanResult(null);
                 setCurrentCard(null);
                 return;
-                
             } else {
                 const enhancedCard = enhanceCardWithScryfall(detectedCard, mockEditions[0]);
                 displayCard(enhancedCard);
@@ -893,19 +734,13 @@ const UltimateMTGScanner = () => {
         if (pendingCardData && selectedEdition) {
             const enhancedCard = enhanceCardWithScryfall(pendingCardData, selectedEdition);
             displayCard(enhancedCard);
-            
-            // Learn preference
-            editionLearningRef.current.learnPreference(pendingCardData.cardName, selectedEdition);
-            
             await saveCardToCollection(enhancedCard);
-            
-            showToast(`✅ ${enhancedCard.cardName} saved with ${selectedEdition.set_name}!`, 'success');
+            showToast(`✅ ${enhancedCard.cardName} saved!`, 'success');
         }
         
         setShowEditionSelector(false);
         setAvailableEditions([]);
         setPendingCardData(null);
-        setAiRecommendation(null);
         cooldownSystemRef.current.setEditionSelectorOpen(false);
     };
 
@@ -918,18 +753,15 @@ const UltimateMTGScanner = () => {
         setShowEditionSelector(false);
         setAvailableEditions([]);
         setPendingCardData(null);
-        setAiRecommendation(null);
         cooldownSystemRef.current.setEditionSelectorOpen(false);
     };
 
     const enhanceCardWithScryfall = (originalCard, scryfallCard) => {
         return {
             ...originalCard,
-            cardType: scryfallCard.type_line || originalCard.cardType,
             setInfo: scryfallCard.set_name,
             setCode: scryfallCard.set,
             prices: scryfallCard.prices,
-            scryfallImageUrl: `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(originalCard.cardName)}&format=image&version=normal`,
             scryfallUri: `https://scryfall.com/search?q=${encodeURIComponent(originalCard.cardName)}`,
             isVerified: true
         };
@@ -938,13 +770,7 @@ const UltimateMTGScanner = () => {
     const displayCard = (card) => {
         setCurrentCard(card);
         setScanResult(card);
-        
-        // Enhanced feedback
-        const accuracyText = card.confidence >= 95 ? 'Excellent' :
-                            card.confidence >= 90 ? 'Great' :
-                            card.confidence >= 85 ? 'Good' : 'Fair';
-        
-        showToast(`🎯 ${accuracyText} detection: ${card.cardName} (${card.confidence}%)`, 'success');
+        showToast(`🎯 ${card.cardName} recognized (${card.confidence}%)`, 'success');
     };
 
     const addToScanHistory = (card) => {
@@ -956,18 +782,13 @@ const UltimateMTGScanner = () => {
         
         setScanHistory(prev => {
             const newHistory = [historyEntry, ...prev.slice(0, 49)];
-            localStorage.setItem('mtg_scan_history', JSON.stringify(newHistory));
+            localStorage.setItem('mtg_scan_history_pro', JSON.stringify(newHistory));
             return newHistory;
         });
     };
 
     const saveCardToCollection = async (card) => {
         try {
-            if (!isPremiumUser && savedCards.length >= FREE_COLLECTION_LIMIT) {
-                setShowPaywallModal(true);
-                return false;
-            }
-            
             const cardWithId = {
                 ...card,
                 id: Date.now() + Math.random(),
@@ -976,7 +797,7 @@ const UltimateMTGScanner = () => {
             
             setSavedCards(prev => {
                 const newCollection = [cardWithId, ...prev];
-                localStorage.setItem('mtg_saved_cards_ultimate', JSON.stringify(newCollection));
+                localStorage.setItem('mtg_saved_cards_pro', JSON.stringify(newCollection));
                 return newCollection;
             });
             
@@ -985,20 +806,6 @@ const UltimateMTGScanner = () => {
             console.error('❌ Failed to save card:', error);
             return false;
         }
-    };
-
-    const handlePremiumUpgrade = () => {
-        // Open PayPal link
-        const paypalLink = `https://www.paypal.com/paypalme/yourusername/9.99`;
-        window.open(paypalLink, '_blank');
-        
-        // Simulate successful upgrade after delay
-        setTimeout(() => {
-            setIsPremiumUser(true);
-            localStorage.setItem('mtg_premium_status', 'true');
-            setShowPaywallModal(false);
-            showToast('💎 Premium upgrade successful! Unlimited scanning unlocked!', 'success');
-        }, 3000);
     };
 
     const stopScanning = () => {
@@ -1011,15 +818,19 @@ const UltimateMTGScanner = () => {
 
     const cleanup = () => {
         stopScanning();
+        if (cameraStreamRef.current) {
+            cameraStreamRef.current.getTracks().forEach(track => track.stop());
+            cameraStreamRef.current = null;
+        }
     };
 
     const removeCardFromCollection = (cardId) => {
         setSavedCards(prev => {
             const newCollection = prev.filter(card => card.id !== cardId);
-            localStorage.setItem('mtg_saved_cards_ultimate', JSON.stringify(newCollection));
+            localStorage.setItem('mtg_saved_cards_pro', JSON.stringify(newCollection));
             return newCollection;
         });
-        showToast('🗑️ Card removed from collection', 'info');
+        showToast('🗑️ Card removed', 'info');
     };
 
     const exportToMoxfield = () => {
@@ -1036,7 +847,7 @@ const UltimateMTGScanner = () => {
         a.download = 'mtg_collection_moxfield.txt';
         a.click();
         URL.revokeObjectURL(url);
-        showToast('📤 Collection exported to Moxfield format!', 'success');
+        showToast('📤 Collection exported!', 'success');
     };
 
     return (
@@ -1065,9 +876,9 @@ const UltimateMTGScanner = () => {
                             background: 'linear-gradient(45deg, #4a90e2, #64b5f6)',
                             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                             backgroundClip: 'text', marginBottom: '5px'
-                        }}>Ultimate MTG Scanner</h1>
+                        }}>MTG Scanner Pro</h1>
                         <span style={{ fontSize: '0.9rem', color: '#b0bec5' }}>
-                            🔥 Smart Cooldowns • 🎭 Edition Selection • 🖼️ Card Art • 💰 Premium Ready
+                            📷 Operative Camera • 🧠 Gemini AI • 🎭 Smart Editions
                         </span>
                     </div>
                 </div>
@@ -1089,16 +900,6 @@ const UltimateMTGScanner = () => {
                         <span style={{ color: '#94a3b8' }}>Collection: </span>
                         <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{savedCards.length}</span>
                     </div>
-                    <div style={{
-                        background: isPremiumUser ? 'rgba(34, 197, 94, 0.1)' : 'rgba(251, 191, 36, 0.1)',
-                        padding: '8px 12px', borderRadius: '20px',
-                        border: `1px solid ${isPremiumUser ? '#22c55e' : '#fbbf24'}`,
-                        fontSize: '0.85rem'
-                    }}>
-                        <span style={{ color: isPremiumUser ? '#22c55e' : '#fbbf24', fontWeight: 'bold' }}>
-                            {isPremiumUser ? '💎 Premium' : '🆓 Free'}
-                        </span>
-                    </div>
                 </div>
             </div>
 
@@ -1109,7 +910,7 @@ const UltimateMTGScanner = () => {
                 borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)'
             }}>
                 {[
-                    { id: 'scanner', label: '🔍 Scanner', badge: null },
+                    { id: 'scanner', label: '📷 Scanner', badge: null },
                     { id: 'collection', label: '🖼️ Collection', badge: savedCards.length },
                     { id: 'history', label: '📊 History', badge: scanHistory.length }
                 ].map(tab => (
@@ -1119,8 +920,7 @@ const UltimateMTGScanner = () => {
                             background: activeTab === tab.id ? 'linear-gradient(45deg, #4a90e2, #64b5f6)' : 'transparent',
                             color: activeTab === tab.id ? 'white' : '#94a3b8',
                             borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                            transition: 'all 0.2s ease'
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                         }}>
                         <span>{tab.label}</span>
                         {tab.badge !== null && (
@@ -1132,13 +932,6 @@ const UltimateMTGScanner = () => {
                     </button>
                 ))}
             </div>
-
-            {/* Premium Progress Indicator */}
-            <PremiumProgressIndicator 
-                current={savedCards.length}
-                limit={FREE_COLLECTION_LIMIT}
-                isPremium={isPremiumUser}
-            />
 
             {/* Main Content */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1154,22 +947,24 @@ const UltimateMTGScanner = () => {
                         }}>
                             {/* Video Container */}
                             <div style={{ position: 'relative', marginBottom: '20px' }}>
-                                {/* Mock Camera Display */}
-                                <div ref={videoRef}
+                                <video ref={videoRef}
                                     style={{
-                                        width: '100%', maxWidth: '640px', height: '360px',
+                                        width: '100%', maxWidth: '640px', height: 'auto',
                                         borderRadius: '12px', border: '2px solid #4a90e2',
-                                        background: 'linear-gradient(135deg, #000, #333)',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        color: '#666', fontSize: '18px', position: 'relative'
-                                    }}>
-                                    {cameraStatus === 'ready' ? '📷 Camera Feed Ready (Demo Mode)' : '📷 Initializing Camera...'}
-                                </div>
+                                        background: '#000'
+                                    }}
+                                    autoPlay playsInline muted />
                                 
-                                {/* Enhanced Cooldown Status */}
-                                <EnhancedCooldownStatus
+                                {/* Cooldown Status */}
+                                <CooldownStatus
                                     cooldownStatus={cooldownStatus}
                                     isVisible={isScanning}
+                                />
+                                
+                                {/* Camera Status */}
+                                <CameraStatus 
+                                    status={cameraStatus} 
+                                    error={cameraError} 
                                 />
                                 
                                 {/* Scanning Overlay */}
@@ -1180,7 +975,28 @@ const UltimateMTGScanner = () => {
                                         padding: '8px 12px', borderRadius: '6px',
                                         fontSize: '14px', fontWeight: '600'
                                     }}>
-                                        🔍 Smart scanning active...
+                                        🔍 Operative scanning with Gemini AI...
+                                    </div>
+                                )}
+                                
+                                {/* Camera Error Overlay */}
+                                {cameraError && (
+                                    <div style={{
+                                        position: 'absolute', top: '50%', left: '50%',
+                                        transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.9)',
+                                        color: 'white', padding: '20px', borderRadius: '12px',
+                                        textAlign: 'center', border: '2px solid #dc3545'
+                                    }}>
+                                        <h3>📹 Camera Issue</h3>
+                                        <p>{cameraError.message}</p>
+                                        <button onClick={() => setupCamera()}
+                                            style={{
+                                                padding: '10px 20px', background: '#4a90e2',
+                                                border: 'none', color: 'white', borderRadius: '6px',
+                                                cursor: 'pointer', marginTop: '10px'
+                                            }}>
+                                            🔄 Try Again
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -1220,10 +1036,9 @@ const UltimateMTGScanner = () => {
                                         color: 'white', borderRadius: '8px',
                                         cursor: cameraStatus !== 'ready' ? 'not-allowed' : 'pointer',
                                         fontSize: '16px', fontWeight: '600',
-                                        opacity: cameraStatus !== 'ready' ? 0.6 : 1,
-                                        transition: 'all 0.2s ease'
+                                        opacity: cameraStatus !== 'ready' ? 0.6 : 1
                                     }}>
-                                    {isScanning ? '⏹️ Stop Smart Scanner' : `🔥 Start ${scanMode} Scan`}
+                                    {isScanning ? '⏹️ Stop Scanner' : `🔥 Start ${scanMode} Scan`}
                                 </button>
                             </div>
                         </div>
@@ -1241,65 +1056,58 @@ const UltimateMTGScanner = () => {
                                     <div style={{
                                         background: 'rgba(34, 197, 94, 0.1)',
                                         border: '1px solid rgba(34, 197, 94, 0.3)',
-                                        borderRadius: '12px', padding: '20px',
-                                        display: 'flex', gap: '20px', alignItems: 'flex-start'
+                                        borderRadius: '12px', padding: '20px'
                                     }}>
-                                        {/* Card Image */}
-                                        <CardImage card={currentCard} size="large" />
+                                        <div style={{ 
+                                            fontSize: '24px', fontWeight: 'bold', color: '#22c55e',
+                                            marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px'
+                                        }}>
+                                            {currentCard.cardName}
+                                            {currentCard.isVerified && <span>✅</span>}
+                                        </div>
                                         
-                                        {/* Card Details */}
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ 
-                                                fontSize: '24px', fontWeight: 'bold', color: '#22c55e',
-                                                marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px'
-                                            }}>
-                                                {currentCard.cardName}
-                                                {currentCard.isVerified && <span style={{fontSize: '16px'}}>✅</span>}
-                                            </div>
-                                            
-                                            <div style={{ fontSize: '14px', color: '#94a3b8', lineHeight: '1.8', marginBottom: '16px' }}>
-                                                {currentCard.cardType && <div><strong>Type:</strong> {currentCard.cardType}</div>}
-                                                {currentCard.setInfo && <div><strong>Set:</strong> {currentCard.setInfo}</div>}
-                                                {currentCard.prices?.usd && <div><strong>Price:</strong> ${currentCard.prices.usd}</div>}
-                                                <div><strong>Confidence:</strong> {currentCard.confidence}%</div>
-                                                <div><strong>Method:</strong> {currentCard.isVerified ? 'Scryfall Verified' : 'AI Detection'}</div>
-                                            </div>
-                                            
-                                            {/* Confidence Bar */}
+                                        <div style={{ fontSize: '14px', color: '#94a3b8', lineHeight: '1.8', marginBottom: '16px' }}>
+                                            {currentCard.cardType && <div><strong>Type:</strong> {currentCard.cardType}</div>}
+                                            {currentCard.setInfo && <div><strong>Set:</strong> {currentCard.setInfo}</div>}
+                                            {currentCard.prices?.usd && <div><strong>Price:</strong> ${currentCard.prices.usd}</div>}
+                                            <div><strong>Confidence:</strong> {currentCard.confidence}%</div>
+                                            <div><strong>Method:</strong> {currentCard.isVerified ? 'Scryfall Verified' : 'Gemini AI'}</div>
+                                        </div>
+                                        
+                                        {/* Confidence Bar */}
+                                        <div style={{
+                                            width: '100%', height: '8px',
+                                            background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px',
+                                            overflow: 'hidden', marginBottom: '16px'
+                                        }}>
                                             <div style={{
-                                                width: '100%', height: '8px',
-                                                background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px',
-                                                overflow: 'hidden', marginBottom: '16px'
-                                            }}>
-                                                <div style={{
-                                                    height: '100%', background: 'linear-gradient(90deg, #22c55e, #34d399)',
-                                                    width: `${currentCard.confidence}%`, borderRadius: '4px',
-                                                    transition: 'width 0.3s ease'
-                                                }}></div>
-                                            </div>
+                                                height: '100%', background: 'linear-gradient(90deg, #22c55e, #34d399)',
+                                                width: `${currentCard.confidence}%`, borderRadius: '4px',
+                                                transition: 'width 0.3s ease'
+                                            }}></div>
+                                        </div>
+                                        
+                                        {/* Action Buttons */}
+                                        <div style={{ display: 'flex', gap: '12px' }}>
+                                            <button onClick={() => saveCardToCollection(currentCard)}
+                                                style={{
+                                                    padding: '12px 20px', background: 'rgba(74, 144, 226, 0.2)',
+                                                    border: '1px solid #4a90e2', color: '#4a90e2',
+                                                    borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600'
+                                                }}>
+                                                💾 Save to Collection
+                                            </button>
                                             
-                                            {/* Action Buttons */}
-                                            <div style={{ display: 'flex', gap: '12px' }}>
-                                                <button onClick={() => saveCardToCollection(currentCard)}
+                                            {currentCard.scryfallUri && (
+                                                <button onClick={() => window.open(currentCard.scryfallUri, '_blank')}
                                                     style={{
-                                                        padding: '12px 20px', background: 'rgba(74, 144, 226, 0.2)',
-                                                        border: '1px solid #4a90e2', color: '#4a90e2',
+                                                        padding: '12px 20px', background: 'rgba(34, 197, 94, 0.2)',
+                                                        border: '1px solid #22c55e', color: '#22c55e',
                                                         borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600'
                                                     }}>
-                                                    💾 Save to Collection
+                                                    🔗 View on Scryfall
                                                 </button>
-                                                
-                                                {currentCard.scryfallUri && (
-                                                    <button onClick={() => window.open(currentCard.scryfallUri, '_blank')}
-                                                        style={{
-                                                            padding: '12px 20px', background: 'rgba(34, 197, 94, 0.2)',
-                                                            border: '1px solid #22c55e', color: '#22c55e',
-                                                            borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600'
-                                                        }}>
-                                                        🔗 View on Scryfall
-                                                    </button>
-                                                )}
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
                                 ) : (
@@ -1343,11 +1151,11 @@ const UltimateMTGScanner = () => {
                             }}>
                                 <div style={{ fontSize: '48px', marginBottom: '16px' }}>🖼️</div>
                                 <h3 style={{ color: '#e2e8f0', marginBottom: '8px' }}>No Cards in Collection</h3>
-                                <p style={{ color: '#94a3b8' }}>Start scanning cards to build your digital collection with beautiful card art!</p>
+                                <p style={{ color: '#94a3b8' }}>Start scanning cards with your operative camera!</p>
                             </div>
                         ) : (
                             <div style={{
-                                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                                 gap: '20px'
                             }}>
                                 {savedCards.map((card, index) => (
@@ -1355,53 +1163,43 @@ const UltimateMTGScanner = () => {
                                         style={{
                                             background: 'rgba(255, 255, 255, 0.05)', borderRadius: '12px',
                                             border: '1px solid rgba(255, 255, 255, 0.1)',
-                                            padding: '16px', transition: 'all 0.2s ease',
-                                            position: 'relative'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.transform = 'translateY(-4px)';
-                                            e.currentTarget.style.boxShadow = '0 8px 32px rgba(74, 144, 226, 0.2)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.transform = 'translateY(0)';
-                                            e.currentTarget.style.boxShadow = 'none';
+                                            padding: '20px', transition: 'all 0.2s ease'
                                         }}>
-                                        
-                                        <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-                                            <CardImage card={card} size="medium" />
-                                        </div>
                                         
                                         <h4 style={{ 
-                                            color: '#4a90e2', marginBottom: '8px', fontSize: '14px',
-                                            textAlign: 'center', fontWeight: '600'
+                                            color: '#4a90e2', marginBottom: '12px', fontSize: '16px',
+                                            display: 'flex', alignItems: 'center', gap: '8px'
                                         }}>
                                             {card.cardName}
+                                            {card.isVerified && <span>✅</span>}
                                         </h4>
                                         
-                                        <div style={{ fontSize: '12px', color: '#94a3b8', textAlign: 'center', marginBottom: '12px' }}>
-                                            {card.setInfo && <div>{card.setInfo}</div>}
-                                            {card.prices?.usd && <div>${card.prices.usd}</div>}
-                                            <div>{card.confidence}% confidence</div>
+                                        <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '16px', lineHeight: '1.6' }}>
+                                            {card.cardType && <div><strong>Type:</strong> {card.cardType}</div>}
+                                            {card.setInfo && <div><strong>Set:</strong> {card.setInfo}</div>}
+                                            {card.prices?.usd && <div><strong>Price:</strong> ${card.prices.usd}</div>}
+                                            <div><strong>Confidence:</strong> {card.confidence}%</div>
+                                            {card.addedAt && <div><strong>Added:</strong> {new Date(card.addedAt).toLocaleDateString()}</div>}
                                         </div>
                                         
                                         <div style={{ display: 'flex', gap: '8px' }}>
                                             {card.scryfallUri && (
                                                 <button onClick={() => window.open(card.scryfallUri, '_blank')}
                                                     style={{
-                                                        flex: 1, padding: '6px 8px', background: 'rgba(74, 144, 226, 0.2)',
+                                                        flex: 1, padding: '8px 12px', background: 'rgba(74, 144, 226, 0.2)',
                                                         border: '1px solid #4a90e2', color: '#4a90e2',
-                                                        borderRadius: '4px', cursor: 'pointer', fontSize: '11px'
+                                                        borderRadius: '6px', cursor: 'pointer', fontSize: '12px'
                                                     }}>
-                                                    🔗
+                                                    🔗 Scryfall
                                                 </button>
                                             )}
                                             <button onClick={() => removeCardFromCollection(card.id)}
                                                 style={{
-                                                    flex: 1, padding: '6px 8px', background: 'rgba(220, 53, 69, 0.2)',
+                                                    flex: 1, padding: '8px 12px', background: 'rgba(220, 53, 69, 0.2)',
                                                     border: '1px solid #dc3545', color: '#dc3545',
-                                                    borderRadius: '4px', cursor: 'pointer', fontSize: '11px'
+                                                    borderRadius: '6px', cursor: 'pointer', fontSize: '12px'
                                                 }}>
-                                                🗑️
+                                                🗑️ Remove
                                             </button>
                                         </div>
                                     </div>
@@ -1479,16 +1277,6 @@ const UltimateMTGScanner = () => {
                 editions={availableEditions}
                 onSelect={handleEditionSelected}
                 onCancel={handleEditionCancelled}
-                aiRecommendation={aiRecommendation}
-            />
-
-            {/* Premium Paywall Modal */}
-            <PremiumPaywallModal
-                isOpen={showPaywallModal}
-                onClose={() => setShowPaywallModal(false)}
-                onUpgrade={handlePremiumUpgrade}
-                cardsScanned={savedCards.length}
-                limit={FREE_COLLECTION_LIMIT}
             />
 
             {/* Status Bar */}
@@ -1500,7 +1288,7 @@ const UltimateMTGScanner = () => {
                 flexWrap: 'wrap', gap: '16px'
             }}>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 'bold', color: '#4a90e2' }}>Ultimate MTG Scanner Pro</div>
+                    <div style={{ fontWeight: 'bold', color: '#4a90e2' }}>MTG Scanner Pro</div>
                     {currentCard && (
                         <span style={{ fontSize: '14px' }}>
                             🎯 Last: {currentCard.cardName} ({currentCard.confidence}%)
@@ -1508,15 +1296,15 @@ const UltimateMTGScanner = () => {
                     )}
                 </div>
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', fontSize: '14px' }}>
-                    <span>📷 {cameraStatus === 'ready' ? 'Ready ✅' : 'Setup ⏳'}</span>
+                    <span>📷 {cameraStatus === 'ready' ? 'Operative ✅' : 'Setup ⏳'}</span>
                     <span>🧠 Gemini AI</span>
-                    <span>🎭 Smart Editions</span>
+                    <span>📊 Scryfall DB</span>
                     <span>⚡ {cooldownStatus.mode || 'Ready'} Mode</span>
-                    <span>{isPremiumUser ? '💎 Premium' : '🆓 Free'}</span>
+                    <span>🔍 Smart Cooldown</span>
                 </div>
             </div>
         </div>
     );
 };
 
-export default UltimateMTGScanner;
+export default MTGScannerPro;

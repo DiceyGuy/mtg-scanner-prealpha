@@ -1,220 +1,7 @@
+// Scanner.js - MTG Scanner Pro - Production Ready with Gemini AI
 import React, { useState, useRef, useEffect } from 'react';
 
-// 🔥 COMPLETE MERGED MTG SCANNER PRO
-// Combines: Camera Selector + User Toggles + Premium System + Professional UI + Smart Cooldown
-
-// 🔧 PROFESSIONAL COMPONENTS - INTEGRATED
-const ProfessionalCooldownStatus = ({ cooldownStatus, isVisible }) => {
-    if (!isVisible || !cooldownStatus) return null;
-
-    return (
-        <div style={{
-            position: 'absolute', top: '10px', right: '10px',
-            background: 'rgba(0,0,0,0.85)', color: 'white', padding: '12px',
-            borderRadius: '8px', fontSize: '11px', fontFamily: 'monospace',
-            border: '1px solid #4a90e2', minWidth: '220px', zIndex: 1000
-        }}>
-            <div style={{color: '#4a90e2', fontWeight: 'bold', marginBottom: '6px', textAlign: 'center'}}>
-                🔥 SCANNING STATUS
-            </div>
-            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                <span>API:</span>
-                <span style={{color: '#64b5f6'}}>{Math.ceil(cooldownStatus.apiCooldown / 1000)}s</span>
-            </div>
-            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                <span>Same Card:</span>
-                <span style={{color: '#64b5f6'}}>{Math.ceil(cooldownStatus.sameCardCooldown / 1000)}s</span>
-            </div>
-            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                <span>Consecutive:</span>
-                <span style={{color: '#64b5f6'}}>{cooldownStatus.consecutiveDetections}/3</span>
-            </div>
-            <div style={{
-                marginTop: '6px', padding: '4px', 
-                background: cooldownStatus.canScan ? 'rgba(40, 167, 69, 0.3)' : 'rgba(220, 53, 69, 0.3)',
-                borderRadius: '4px', textAlign: 'center', fontWeight: 'bold'
-            }}>
-                {cooldownStatus.canScan ? '✅ Ready' : '⏳ Cooldown'}
-            </div>
-        </div>
-    );
-};
-
-// 📷 ADVANCED CAMERA STATUS & SELECTOR
-const CameraSelector = ({ availableCameras, selectedCameraId, onCameraChange, onRefresh, onDiagnose, cameraStatus }) => {
-    const [showSelector, setShowSelector] = useState(false);
-
-    const getStatusColor = () => {
-        switch (cameraStatus) {
-            case 'ready': return '#28a745';
-            case 'error': case 'permission-denied': case 'no-device': return '#dc3545';
-            case 'requesting': return '#ffc107';
-            default: return '#17a2b8';
-        }
-    };
-
-    const getStatusText = () => {
-        switch (cameraStatus) {
-            case 'ready': return `✅ Camera Ready (${availableCameras.length} available)`;
-            case 'error': return '❌ Camera Error - Click to retry';
-            case 'permission-denied': return '🚫 Camera permission denied';
-            case 'no-device': return '📷 No camera detected';
-            case 'requesting': return '🔄 Requesting camera access...';
-            default: return '🔧 Initializing camera system...';
-        }
-    };
-
-    return (
-        <div style={{ marginBottom: '16px' }}>
-            {/* Camera Status Bar */}
-            <div style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                border: `1px solid ${getStatusColor()}`,
-                marginBottom: '12px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-            }}>
-                <div style={{ color: getStatusColor(), fontWeight: '600', fontSize: '14px' }}>
-                    {getStatusText()}
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => setShowSelector(!showSelector)}
-                        style={{
-                            padding: '6px 12px', background: 'rgba(74, 144, 226, 0.2)',
-                            border: '1px solid #4a90e2', color: '#4a90e2', borderRadius: '4px',
-                            cursor: 'pointer', fontSize: '12px', fontWeight: '500'
-                        }}>
-                        📷 Select
-                    </button>
-                    <button onClick={onRefresh}
-                        style={{
-                            padding: '6px 12px', background: 'rgba(34, 197, 94, 0.2)',
-                            border: '1px solid #22c55e', color: '#22c55e', borderRadius: '4px',
-                            cursor: 'pointer', fontSize: '12px', fontWeight: '500'
-                        }}>
-                        🔄 Refresh
-                    </button>
-                    <button onClick={onDiagnose}
-                        style={{
-                            padding: '6px 12px', background: 'rgba(255, 193, 7, 0.2)',
-                            border: '1px solid #ffc107', color: '#ffc107', borderRadius: '4px',
-                            cursor: 'pointer', fontSize: '12px', fontWeight: '500'
-                        }}>
-                        🔍 Diagnose
-                    </button>
-                </div>
-            </div>
-
-            {/* Camera Selector Dropdown */}
-            {showSelector && (
-                <div style={{
-                    background: 'rgba(255, 255, 255, 0.05)', padding: '16px',
-                    borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)'
-                }}>
-                    <h4 style={{ color: '#4a90e2', marginBottom: '12px', fontSize: '16px' }}>
-                        📷 Available Cameras:
-                    </h4>
-                    
-                    {availableCameras.length === 0 ? (
-                        <div style={{ 
-                            color: '#dc3545', textAlign: 'center', padding: '20px',
-                            background: 'rgba(220, 53, 69, 0.1)', borderRadius: '6px',
-                            border: '1px solid rgba(220, 53, 69, 0.3)'
-                        }}>
-                            <div style={{ fontSize: '32px', marginBottom: '8px' }}>📷</div>
-                            <div style={{ fontWeight: '600', marginBottom: '4px' }}>No cameras detected</div>
-                            <small>Try refreshing or connecting a camera</small>
-                        </div>
-                    ) : (
-                        availableCameras.map((camera, index) => {
-                            const isLogitech = camera.label.toLowerCase().includes('logitech');
-                            const isBuiltIn = camera.label.toLowerCase().includes('built-in') || 
-                                            camera.label.toLowerCase().includes('integrated');
-                            const isSelected = selectedCameraId === camera.deviceId;
-
-                            return (
-                                <div key={camera.deviceId} onClick={() => {
-                                        onCameraChange(camera.deviceId);
-                                        setShowSelector(false);
-                                    }}
-                                    style={{
-                                        padding: '12px', margin: '8px 0',
-                                        background: isSelected ? 'rgba(74, 144, 226, 0.3)' : 'rgba(255,255,255,0.05)',
-                                        border: isSelected ? '2px solid #4a90e2' : '1px solid #666',
-                                        borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s'
-                                    }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <div>
-                                            <div style={{ fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span>📷</span>
-                                                <span>{camera.label || `Camera ${index + 1}`}</span>
-                                                {isLogitech && (
-                                                    <span style={{ 
-                                                        background: '#22c55e', color: 'white', 
-                                                        padding: '2px 6px', borderRadius: '4px', fontSize: '10px' 
-                                                    }}>RECOMMENDED</span>
-                                                )}
-                                            </div>
-                                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                                                {isLogitech && <span style={{ color: '#22c55e' }}>🎯 USB Camera</span>}
-                                                {isBuiltIn && <span style={{ color: '#64b5f6' }}>💻 Built-in</span>}
-                                            </div>
-                                        </div>
-                                        {isSelected && (
-                                            <div style={{ color: '#4a90e2', fontWeight: 'bold' }}>✅ Active</div>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
-
-// 🎯 PROFESSIONAL TABS
-const ProfessionalTabs = ({ activeTab, onTabChange, savedCards }) => {
-    const tabs = [
-        { id: 'scanner', label: '🔍 Scanner', badge: null },
-        { id: 'collection', label: '🃏 Collection', badge: savedCards?.length || 0 },
-        { id: 'knowledge', label: '📚 Knowledge', badge: null },
-        { id: 'premium', label: '💎 Premium', badge: null }
-    ];
-
-    return (
-        <div style={{
-            display: 'flex', gap: '4px', marginBottom: '20px',
-            background: 'rgba(255, 255, 255, 0.05)', padding: '4px',
-            borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)'
-        }}>
-            {tabs.map(tab => (
-                <button key={tab.id} onClick={() => onTabChange(tab.id)}
-                    style={{
-                        flex: 1, padding: '12px 16px', border: 'none',
-                        background: activeTab === tab.id ? 'linear-gradient(45deg, #4a90e2, #64b5f6)' : 'transparent',
-                        color: activeTab === tab.id ? 'white' : '#94a3b8',
-                        borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-                    }}>
-                    <span>{tab.label}</span>
-                    {tab.badge !== null && (
-                        <span style={{
-                            background: 'rgba(74, 144, 226, 0.2)', color: '#4a90e2',
-                            padding: '2px 6px', borderRadius: '10px', fontSize: '11px', fontWeight: '700'
-                        }}>{tab.badge}</span>
-                    )}
-                </button>
-            ))}
-        </div>
-    );
-};
-
-// 🔔 PROFESSIONAL TOAST NOTIFICATIONS
+// 🔥 PROFESSIONAL TOAST NOTIFICATIONS
 const showToast = (message, type = 'info', duration = 3000) => {
     const existingToasts = document.querySelectorAll('.toast-message');
     existingToasts.forEach(toast => toast.remove());
@@ -223,676 +10,247 @@ const showToast = (message, type = 'info', duration = 3000) => {
     toast.className = 'toast-message';
     toast.style.cssText = `
         position: fixed; top: 20px; right: 20px; z-index: 10001;
-        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : type === 'warning' ? '#ffc107' : '#17a2b8'};
-        color: white; padding: 12px 20px; border-radius: 8px; font-weight: 500;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.3); max-width: 350px;
-        animation: slideInRight 0.3s ease-out;
+        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
+        color: white; padding: 12px 20px; border-radius: 6px;
+        font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.2); max-width: 300px;
+        animation: slideIn 0.3s ease-out;
     `;
-    toast.textContent = message;
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
     
+    toast.textContent = message;
     document.body.appendChild(toast);
     setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, duration);
 };
 
-// 📚 ENHANCED KNOWLEDGE BASE
-const MTGKnowledgeBase = ({ currentCard, savedCards }) => {
-    const [activeSection, setActiveSection] = useState('current');
-
-    const getCollectionInsights = () => {
-        if (savedCards.length === 0) return null;
+// 🧠 GEMINI VISION SERVICE - PRODUCTION READY
+class GeminiVisionService {
+    constructor() {
+        this.geminiApiKey = process.env.REACT_APP_GEMINI_API_KEY;
+        this.geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+        this.lastApiCall = 0;
+        this.rateLimitDelay = 2000; // 2 seconds between calls
+        this.consecutiveErrors = 0;
+        this.maxRetries = 3;
         
-        const colorCount = {}, typeCount = {}, setCount = {}, rarityCount = {};
-        let totalValue = 0;
-        
-        savedCards.forEach(card => {
-            if (card.colors && Array.isArray(card.colors)) {
-                card.colors.forEach(color => {
-                    colorCount[color] = (colorCount[color] || 0) + 1;
-                });
-            }
-            
-            if (card.cardType) {
-                const mainType = card.cardType.split('—')[0].trim();
-                typeCount[mainType] = (typeCount[mainType] || 0) + 1;
-            }
-
-            if (card.setInfo) setCount[card.setInfo] = (setCount[card.setInfo] || 0) + 1;
-            if (card.rarity) rarityCount[card.rarity] = (rarityCount[card.rarity] || 0) + 1;
-            if (card.prices && card.prices.usd) totalValue += parseFloat(card.prices.usd) || 0;
-        });
-
-        return { colorCount, typeCount, setCount, rarityCount, totalCards: savedCards.length, estimatedValue: totalValue.toFixed(2) };
-    };
-
-    const getCardAnalysis = (card) => {
-        if (!card.cardType) return 'Card type information not available.';
-        
-        const type = card.cardType.toLowerCase();
-        if (type.includes('creature')) {
-            return 'This creature can attack and block. Consider its power, toughness, and abilities when building your deck. Check EDHREC.com for popular synergies.';
-        } else if (type.includes('instant')) {
-            return 'This instant can be played at any time you have priority, including during your opponent\'s turn. Great for reactive strategies and combo protection.';
-        } else if (type.includes('sorcery')) {
-            return 'This sorcery can only be played during your main phases when the stack is empty. Often provides powerful proactive effects.';
-        } else if (type.includes('enchantment')) {
-            return 'This enchantment provides ongoing effects while it remains on the battlefield. Check for synergies with enchantment-based strategies.';
-        } else if (type.includes('artifact')) {
-            return 'This artifact is colorless and can fit into any deck. Often provides utility or serves as combo pieces in artifact-based strategies.';
-        } else if (type.includes('land')) {
-            return 'This land can produce mana to cast your spells. Essential for consistent mana bases. Check interactions with land-based strategies.';
-        } else if (type.includes('planeswalker')) {
-            return 'This planeswalker is a powerful ally that can use loyalty abilities. Protect it from attacks! Often serves as win conditions.';
+        console.log('🧠 Gemini Vision Service initialized');
+        if (!this.geminiApiKey) {
+            console.error('❌ GEMINI_API_KEY not found in environment variables');
         }
-        return 'This card has a unique type. Check its rules text and visit EDHREC.com for deck building suggestions.';
-    };
+    }
 
-    const insights = getCollectionInsights();
+    async processVideoFrame(videoElement) {
+        const startTime = performance.now();
+        
+        try {
+            // Rate limiting
+            const now = Date.now();
+            const timeSinceLastCall = now - this.lastApiCall;
+            if (timeSinceLastCall < this.rateLimitDelay) {
+                const waitTime = this.rateLimitDelay - timeSinceLastCall;
+                console.log(`⏳ Rate limiting: waiting ${waitTime}ms`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+            this.lastApiCall = Date.now();
 
-    return (
-        <div style={{ padding: '20px', color: 'white' }}>
-            <h2 style={{ color: '#4a90e2', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                📚 MTG Knowledge Base
-            </h2>
+            // Capture frame
+            const frameData = this.captureFrame(videoElement);
+            const imageBase64 = frameData.canvas.toDataURL('image/jpeg', 0.8);
+            const base64Data = imageBase64.split(',')[1];
+
+            // Call Gemini API
+            const result = await this.callGeminiAPI(base64Data);
             
-            {/* Navigation */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                {['current', 'collection', 'external'].map(section => (
-                    <button key={section} onClick={() => setActiveSection(section)}
-                        style={{
-                            padding: '10px 20px',
-                            background: activeSection === section ? '#4a90e2' : 'rgba(74, 144, 226, 0.1)',
-                            color: activeSection === section ? 'white' : '#4a90e2',
-                            border: '1px solid #4a90e2', borderRadius: '8px',
-                            cursor: 'pointer', fontSize: '14px', fontWeight: '600'
-                        }}>
-                        {section === 'current' ? '🔍 Current Card' : 
-                         section === 'collection' ? '📊 Collection' : '🌐 External Tools'}
-                    </button>
-                ))}
-            </div>
-
-            {/* Current Card Analysis */}
-            {activeSection === 'current' && (
-                <div>
-                    {currentCard ? (
-                        <div style={{ 
-                            background: 'rgba(74, 144, 226, 0.1)', padding: '24px', 
-                            borderRadius: '12px', border: '1px solid rgba(74, 144, 226, 0.3)'
-                        }}>
-                            <h3 style={{ color: '#4a90e2', marginBottom: '16px' }}>
-                                🎯 Analyzing: {currentCard.cardName}
-                            </h3>
-                            
-                            <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
-                                {[
-                                    ['Type', currentCard.cardType || 'Unknown'],
-                                    ['Mana Cost', currentCard.manaCost],
-                                    ['Set', currentCard.setInfo || 'Unknown'],
-                                    ['Rarity', currentCard.rarity || 'Unknown'],
-                                    ['Price', currentCard.prices?.usd ? `$${currentCard.prices.usd}` : null]
-                                ].filter(([_, value]) => value).map(([label, value]) => (
-                                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: '#94a3b8' }}>{label}:</span>
-                                        <span style={{ fontWeight: '600', color: label === 'Price' ? '#22c55e' : 'white' }}>{value}</span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div style={{ 
-                                background: 'rgba(255, 255, 255, 0.05)', padding: '16px', 
-                                borderRadius: '8px', marginTop: '16px'
-                            }}>
-                                <h4 style={{ color: '#e2e8f0', marginBottom: '8px' }}>💡 Card Analysis</h4>
-                                <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: '1.6' }}>
-                                    {getCardAnalysis(currentCard)}
-                                </p>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
-                                <button onClick={() => window.open(`https://edhrec.com/cards/${encodeURIComponent(currentCard.cardName.toLowerCase().replace(/\s+/g, '-'))}`, '_blank')}
-                                    style={{
-                                        padding: '8px 16px', background: 'rgba(74, 144, 226, 0.2)',
-                                        border: '1px solid #4a90e2', color: '#4a90e2', borderRadius: '6px',
-                                        cursor: 'pointer', fontSize: '13px', fontWeight: '600'
-                                    }}>
-                                    📊 View on EDHREC
-                                </button>
-                                {currentCard.scryfallUri && (
-                                    <button onClick={() => window.open(currentCard.scryfallUri, '_blank')}
-                                        style={{
-                                            padding: '8px 16px', background: 'rgba(34, 197, 94, 0.2)',
-                                            border: '1px solid #22c55e', color: '#22c55e', borderRadius: '6px',
-                                            cursor: 'pointer', fontSize: '13px', fontWeight: '600'
-                                        }}>
-                                        🔗 View on Scryfall
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    ) : (
-                        <div style={{ 
-                            textAlign: 'center', padding: '60px 20px',
-                            background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px',
-                            border: '1px dashed rgba(255, 255, 255, 0.1)'
-                        }}>
-                            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🃏</div>
-                            <h3 style={{ color: '#e2e8f0', marginBottom: '8px' }}>No Card Selected</h3>
-                            <p style={{ color: '#94a3b8' }}>
-                                Scan a card in the Scanner tab to see detailed analysis here.
-                            </p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Collection Insights */}
-            {activeSection === 'collection' && (
-                <div>
-                    {insights ? (
-                        <div>
-                            <div style={{ 
-                                background: 'rgba(34, 197, 94, 0.1)', padding: '24px', 
-                                borderRadius: '12px', border: '1px solid rgba(34, 197, 94, 0.3)', marginBottom: '20px'
-                            }}>
-                                <h3 style={{ color: '#22c55e', marginBottom: '16px' }}>📊 Collection Overview</h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '16px' }}>
-                                    {[
-                                        [insights.totalCards, 'Total Cards'],
-                                        [`$${insights.estimatedValue}`, 'Est. Value'],
-                                        [Object.keys(insights.setCount).length, 'Different Sets']
-                                    ].map(([value, label]) => (
-                                        <div key={label} style={{ textAlign: 'center' }}>
-                                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#22c55e' }}>{value}</div>
-                                            <div style={{ color: '#94a3b8', fontSize: '12px' }}>{label}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {Object.keys(insights.colorCount).length > 0 && (
-                                <div style={{ 
-                                    background: 'rgba(255, 255, 255, 0.05)', padding: '20px', 
-                                    borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)', marginBottom: '20px'
-                                }}>
-                                    <h4 style={{ color: '#e2e8f0', marginBottom: '16px' }}>🎨 Color Distribution</h4>
-                                    <div style={{ display: 'grid', gap: '8px' }}>
-                                        {Object.entries(insights.colorCount).map(([color, count]) => (
-                                            <div key={color} style={{ 
-                                                display: 'flex', justifyContent: 'space-between',
-                                                alignItems: 'center', padding: '8px 0'
-                                            }}>
-                                                <span>
-                                                    {{'W': '⚪', 'U': '🔵', 'B': '⚫', 'R': '🔴', 'G': '🟢'}[color] || '⚪'} 
-                                                    {{'W': 'White', 'U': 'Blue', 'B': 'Black', 'R': 'Red', 'G': 'Green'}[color] || color}
-                                                </span>
-                                                <span style={{ fontWeight: '600' }}>{count}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div style={{ 
-                            textAlign: 'center', padding: '60px 20px',
-                            background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px',
-                            border: '1px dashed rgba(255, 255, 255, 0.1)'
-                        }}>
-                            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
-                            <h3 style={{ color: '#e2e8f0', marginBottom: '8px' }}>No Collection Data</h3>
-                            <p style={{ color: '#94a3b8' }}>
-                                Start scanning cards to see collection insights and analytics.
-                            </p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* External Tools */}
-            {activeSection === 'external' && (
-                <div style={{ display: 'grid', gap: '16px' }}>
-                    <div style={{ 
-                        background: 'rgba(255, 255, 255, 0.05)', padding: '20px', 
-                        borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)'
-                    }}>
-                        <h4 style={{ color: '#4a90e2', marginBottom: '12px' }}>🏗️ Deck Building Tools</h4>
-                        <div style={{ display: 'grid', gap: '8px' }}>
-                            {[
-                                ['EDHREC.com', 'Commander deck statistics and recommendations', 'https://edhrec.com/'],
-                                ['Moxfield.com', 'Advanced deck builder and collection manager', 'https://www.moxfield.com/'],
-                                ['MTGTop8.com', 'Tournament results and competitive meta analysis', 'https://www.mtgtop8.com/']
-                            ].map(([name, desc, url]) => (
-                                <button key={name} onClick={() => window.open(url, '_blank')}
-                                    style={{
-                                        padding: '12px', background: 'rgba(74, 144, 226, 0.1)',
-                                        border: '1px solid rgba(74, 144, 226, 0.3)', color: '#4a90e2',
-                                        borderRadius: '8px', cursor: 'pointer', textAlign: 'left'
-                                    }}>
-                                    <strong>{name}</strong> - {desc}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-// 🗂️ ENHANCED COLLECTION MANAGER
-const CollectionManager = ({ savedCards, onRemoveCard, onOpenScryfall }) => {
-    const [viewMode, setViewMode] = useState('grid');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [sortBy, setSortBy] = useState('name');
-    const [filterBy, setFilterBy] = useState('all');
-
-    const getUniqueTypes = () => {
-        const types = new Set();
-        savedCards.forEach(card => {
-            if (card.cardType) {
-                const mainType = card.cardType.split('—')[0].trim();
-                types.add(mainType);
-            }
-        });
-        return Array.from(types).sort();
-    };
-
-    const filteredAndSortedCards = savedCards
-        .filter(card => {
-            const matchesSearch = card.cardName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (card.cardType && card.cardType.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (card.setInfo && card.setInfo.toLowerCase().includes(searchTerm.toLowerCase()));
-            
-            if (filterBy === 'all') return matchesSearch;
-            if (filterBy.startsWith('type:')) {
-                const typeFilter = filterBy.replace('type:', '');
-                return matchesSearch && card.cardType && card.cardType.toLowerCase().includes(typeFilter.toLowerCase());
-            }
-            return matchesSearch;
-        })
-        .sort((a, b) => {
-            switch (sortBy) {
-                case 'name': return a.cardName.localeCompare(b.cardName);
-                case 'type': return (a.cardType || '').localeCompare(b.cardType || '');
-                case 'set': return (a.setInfo || '').localeCompare(b.setInfo || '');
-                case 'date': return new Date(b.addedAt) - new Date(a.addedAt);
-                case 'value':
-                    const aValue = (a.prices && a.prices.usd) ? parseFloat(a.prices.usd) : 0;
-                    const bValue = (b.prices && b.prices.usd) ? parseFloat(b.prices.usd) : 0;
-                    return bValue - aValue;
-                default: return 0;
-            }
-        });
-
-    const exportToMoxfield = () => {
-        const moxfieldFormat = savedCards.map(card => `1 ${card.cardName}`).join('\n');
-        const blob = new Blob([moxfieldFormat], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'mtg_collection.txt'; a.click();
-        URL.revokeObjectURL(url);
-        showToast('📁 Collection exported for Moxfield!', 'success');
-    };
-
-    const calculateCollectionValue = () => {
-        return savedCards.reduce((total, card) => {
-            if (card.prices && card.prices.usd) {
-                return total + parseFloat(card.prices.usd);
-            }
-            return total;
-        }, 0).toFixed(2);
-    };
-
-    return (
-        <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                <h2 style={{ color: '#4a90e2', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    🃏 Card Collection ({savedCards.length} cards)
-                </h2>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#22c55e' }}>
-                    💰 Total Value: ${calculateCollectionValue()}
-                </div>
-            </div>
-
-            {/* Enhanced Controls */}
-            <div style={{ 
-                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '12px', marginBottom: '24px', alignItems: 'end'
-            }}>
-                <div>
-                    <label style={{ color: '#b0bec5', marginBottom: '4px', display: 'block', fontSize: '12px' }}>Search Cards</label>
-                    <input type="text" placeholder="Search by name, type, or set..." value={searchTerm} 
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{
-                            width: '100%', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.1)',
-                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '6px',
-                            color: 'white', fontSize: '14px'
-                        }} />
-                </div>
+            if (result.hasCard) {
+                this.consecutiveErrors = 0;
                 
-                <div>
-                    <label style={{ color: '#b0bec5', marginBottom: '4px', display: 'block', fontSize: '12px' }}>Sort By</label>
-                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
-                        style={{
-                            width: '100%', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.1)',
-                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '6px',
-                            color: 'white', fontSize: '14px'
-                        }}>
-                        <option value="name">Name</option>
-                        <option value="type">Type</option>
-                        <option value="set">Set</option>
-                        <option value="date">Date Added</option>
-                        <option value="value">Value (High to Low)</option>
-                    </select>
-                </div>
+                // Enhance with Scryfall data
+                const enhancedResult = await this.enhanceWithScryfall(result);
+                
+                const processingTime = Math.round(performance.now() - startTime);
+                return {
+                    ...enhancedResult,
+                    processingTime,
+                    timestamp: new Date().toISOString()
+                };
+            }
+            
+            return result;
+            
+        } catch (error) {
+            this.consecutiveErrors++;
+            console.error('❌ Vision processing error:', error);
+            
+            const processingTime = Math.round(performance.now() - startTime);
+            return {
+                hasCard: false,
+                message: `Scanner error: ${error.message}`,
+                confidence: 0,
+                processingTime,
+                timestamp: new Date().toISOString()
+            };
+        }
+    }
 
-                <div>
-                    <label style={{ color: '#b0bec5', marginBottom: '4px', display: 'block', fontSize: '12px' }}>Filter</label>
-                    <select value={filterBy} onChange={(e) => setFilterBy(e.target.value)}
-                        style={{
-                            width: '100%', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.1)',
-                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '6px',
-                            color: 'white', fontSize: '14px'
-                        }}>
-                        <option value="all">All Cards</option>
-                        {getUniqueTypes().map(type => (
-                            <option key={type} value={`type:${type}`}>{type}</option>
-                        ))}
-                    </select>
-                </div>
+    captureFrame(videoElement) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        canvas.width = videoElement.videoWidth;
+        canvas.height = videoElement.videoHeight;
+        
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(videoElement, 0, 0);
+        
+        return { canvas, width: canvas.width, height: canvas.height };
+    }
 
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                        style={{
-                            padding: '8px 12px', background: 'rgba(74, 144, 226, 0.2)',
-                            border: '1px solid #4a90e2', color: '#4a90e2', borderRadius: '6px',
-                            cursor: 'pointer', fontSize: '14px', whiteSpace: 'nowrap'
-                        }}>
-                        {viewMode === 'grid' ? '📋 List' : '🔲 Grid'}
-                    </button>
-                </div>
-            </div>
+    async callGeminiAPI(base64Data) {
+        if (!this.geminiApiKey) {
+            throw new Error('Gemini API key not configured');
+        }
 
-            {/* Export Tools */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                <button onClick={exportToMoxfield}
-                    style={{
-                        padding: '8px 16px', background: 'rgba(34, 197, 94, 0.2)',
-                        border: '1px solid #22c55e', color: '#22c55e', borderRadius: '6px',
-                        cursor: 'pointer', fontSize: '14px'
-                    }}>
-                    📤 Export to Moxfield
-                </button>
-                <button onClick={() => window.open('https://edhrec.com/', '_blank')}
-                    style={{
-                        padding: '8px 16px', background: 'rgba(74, 144, 226, 0.2)',
-                        border: '1px solid #4a90e2', color: '#4a90e2', borderRadius: '6px',
-                        cursor: 'pointer', fontSize: '14px'
-                    }}>
-                    🌐 Analyze on EDHREC
-                </button>
-            </div>
+        const prompt = `Analyze this image for Magic: The Gathering cards. If you see a clear MTG card:
 
-            {/* Cards Display */}
-            {filteredAndSortedCards.length === 0 ? (
-                <div style={{
-                    textAlign: 'center', padding: '60px 20px',
-                    background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px',
-                    border: '1px dashed rgba(255, 255, 255, 0.1)'
-                }}>
-                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🃏</div>
-                    <h3 style={{ color: '#e2e8f0', marginBottom: '8px' }}>
-                        {searchTerm || filterBy !== 'all' ? 'No matching cards found' : 'No Cards in Collection'}
-                    </h3>
-                    <p style={{ color: '#94a3b8' }}>
-                        {searchTerm || filterBy !== 'all' ? 
-                            'Try adjusting your search or filter criteria' : 
-                            'Start scanning cards to build your collection'
+1. Identify the exact card name
+2. Determine confidence level (80-100 for clear cards only)
+3. Note any visible mana cost or type information
+
+Respond in this exact format:
+CARD_NAME: [exact name]
+CONFIDENCE: [80-100]
+TYPE: [card type if visible]
+MANA_COST: [mana cost if visible]
+
+If no clear MTG card is visible, respond with: NO_MTG_CARD`;
+
+        const requestBody = {
+            contents: [{
+                parts: [
+                    { text: prompt },
+                    {
+                        inline_data: {
+                            mime_type: "image/jpeg",
+                            data: base64Data
                         }
-                    </p>
-                </div>
-            ) : (
-                <div style={{
-                    display: viewMode === 'grid' ? 'grid' : 'block',
-                    gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(300px, 1fr))' : '1fr',
-                    gap: '16px'
-                }}>
-                    {filteredAndSortedCards.map((card, index) => (
-                        <div key={card.id || index}
-                            style={{
-                                background: 'rgba(255, 255, 255, 0.05)', padding: '16px', borderRadius: '8px',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                display: viewMode === 'list' ? 'flex' : 'block',
-                                alignItems: viewMode === 'list' ? 'center' : 'stretch',
-                                gap: viewMode === 'list' ? '16px' : '0',
-                                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(74, 144, 226, 0.2)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = 'none';
-                            }}>
-                            <div style={{ flex: viewMode === 'list' ? '1' : 'auto' }}>
-                                <h4 style={{ color: '#4a90e2', marginBottom: '8px', fontSize: '16px', fontWeight: '600' }}>
-                                    {card.cardName}
-                                </h4>
-                                <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '8px', lineHeight: '1.4' }}>
-                                    {card.cardType && <div><strong>Type:</strong> {card.cardType}</div>}
-                                    {card.setInfo && <div><strong>Set:</strong> {card.setInfo}</div>}
-                                    {card.rarity && (
-                                        <div>
-                                            <strong>Rarity:</strong> 
-                                            <span style={{ 
-                                                color: card.rarity === 'mythic' ? '#ff8c00' : 
-                                                       card.rarity === 'rare' ? '#ffd700' : 
-                                                       card.rarity === 'uncommon' ? '#c0c0c0' : '#94a3b8',
-                                                marginLeft: '4px', textTransform: 'capitalize'
-                                            }}>
-                                                {card.rarity}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {card.prices && card.prices.usd && (
-                                        <div style={{ color: '#22c55e', fontWeight: '600' }}>
-                                            <strong>Value:</strong> ${card.prices.usd}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            
-                            <div style={{ 
-                                display: 'flex', gap: '8px', marginTop: viewMode === 'grid' ? '12px' : '0', flexWrap: 'wrap'
-                            }}>
-                                <button onClick={() => onOpenScryfall(card)}
-                                    style={{
-                                        padding: '6px 12px', background: 'rgba(74, 144, 226, 0.2)',
-                                        border: '1px solid #4a90e2', color: '#4a90e2', borderRadius: '4px',
-                                        cursor: 'pointer', fontSize: '12px', fontWeight: '500'
-                                    }}>
-                                    🔗 Scryfall
-                                </button>
-                                <button onClick={() => {
-                                        if (window.confirm(`Remove "${card.cardName}" from collection?`)) {
-                                            onRemoveCard(card.id);
-                                        }
-                                    }}
-                                    style={{
-                                        padding: '6px 12px', background: 'rgba(220, 53, 69, 0.2)',
-                                        border: '1px solid #dc3545', color: '#dc3545', borderRadius: '4px',
-                                        cursor: 'pointer', fontSize: '12px', fontWeight: '500'
-                                    }}>
-                                    🗑️ Remove
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
+                    }
+                ]
+            }],
+            generationConfig: {
+                temperature: 0.1,
+                topK: 1,
+                topP: 0.8,
+                maxOutputTokens: 200
+            }
+        };
 
-// 💎 PREMIUM UPGRADE SYSTEM
-const PremiumUpgradeSystem = ({ onClose }) => {
-    return (
-        <div style={{
-            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-            background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', zIndex: 10000
-        }}>
-            <div style={{
-                background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f1419 100%)',
-                border: '2px solid #4a90e2', borderRadius: '16px', padding: '32px',
-                maxWidth: '600px', width: '90%', textAlign: 'center', color: 'white'
-            }}>
-                <h1 style={{
-                    fontSize: '48px', margin: '0 0 16px 0',
-                    background: 'linear-gradient(45deg, #4a90e2, #ff6b35)',
-                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
-                }}>
-                    MTG Scanner Pro
-                </h1>
-                <p style={{ fontSize: '24px', margin: '0 0 32px 0', opacity: 0.9 }}>
-                    🔥 Unlock the Ultimate MTG Collection Experience
-                </p>
+        const response = await fetch(`${this.geminiApiUrl}?key=${this.geminiApiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
 
-                {/* Free Features */}
-                <div style={{
-                    background: '#2a2d34', border: '1px solid #444', borderRadius: '12px',
-                    padding: '32px', textAlign: 'center', marginBottom: '32px'
-                }}>
-                    <h3 style={{ fontSize: '24px', margin: '0 0 16px 0', color: '#4a90e2' }}>
-                        🆓 Free Forever
-                    </h3>
-                    <div style={{ fontSize: '48px', fontWeight: 'bold', margin: '16px 0' }}>€0</div>
-                    <p style={{ opacity: 0.8, marginBottom: '24px' }}>Perfect for casual players</p>
-                    
-                    <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left', marginBottom: '32px' }}>
-                        {[
-                            { icon: '🔍', text: '15 scans per day', included: true },
-                            { icon: '📱', text: 'Mobile & webcam support', included: true },
-                            { icon: '🎴', text: '100 card collection limit', included: true },
-                            { icon: '📊', text: 'Basic deck export (.txt)', included: true },
-                            { icon: '🌐', text: 'Scryfall integration', included: true },
-                            { icon: '🧠', text: 'AI learning system', included: true },
-                            { icon: '🎭', text: 'Edition selection', included: true }
-                        ].map((feature, i) => (
-                            <li key={i} style={{ 
-                                padding: '8px 0', display: 'flex', alignItems: 'center', opacity: feature.included ? 1 : 0.5
-                            }}>
-                                <span style={{ marginRight: '12px', fontSize: '18px' }}>{feature.icon}</span>
-                                {feature.text}
-                                <span style={{ marginLeft: 'auto', color: '#28a745' }}>✅</span>
-                            </li>
-                        ))}
-                    </ul>
-                    
-                    <button style={{
-                        width: '100%', padding: '12px', border: '2px solid #4a90e2',
-                        borderRadius: '8px', background: 'transparent', color: '#4a90e2',
-                        fontSize: '16px', fontWeight: 'bold', cursor: 'pointer'
-                    }}>
-                        🚀 Start Scanning Free
-                    </button>
-                </div>
+        if (!response.ok) {
+            if (response.status === 429) {
+                // Rate limited - increase delay
+                this.rateLimitDelay = Math.min(this.rateLimitDelay * 1.5, 15000);
+                throw new Error(`Rate limited - reducing scan speed`);
+            }
+            throw new Error(`Gemini API error: ${response.status}`);
+        }
 
-                {/* Premium Features */}
-                <div style={{
-                    background: 'rgba(74, 144, 226, 0.1)', border: '1px solid #4a90e2',
-                    borderRadius: '16px', padding: '32px', marginBottom: '32px'
-                }}>
-                    <h3 style={{ textAlign: 'center', fontSize: '28px', margin: '0 0 32px 0', color: '#4a90e2' }}>
-                        💎 Pro Features
-                    </h3>
-                    
-                    <div style={{
-                        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px'
-                    }}>
-                        {[
-                            { icon: '🚀', text: 'Unlimited scanning', highlight: true },
-                            { icon: '📊', text: 'Advanced deck analyzer', highlight: true },
-                            { icon: '💰', text: 'Real-time price tracking', highlight: true },
-                            { icon: '☁️', text: 'Cloud backup & sync', highlight: true },
-                            { icon: '📂', text: 'Unlimited collection storage', highlight: true },
-                            { icon: '🔄', text: 'Import/export to all platforms', highlight: true },
-                            { icon: '🎯', text: 'Premium AI recognition', highlight: true },
-                            { icon: '🌙', text: 'Dark mode & themes', highlight: true },
-                            { icon: '⚡', text: 'Early access features', highlight: true },
-                            { icon: '👑', text: 'Premium Discord badge', highlight: true }
-                        ].map((feature, i) => (
-                            <div key={i} style={{
-                                display: 'flex', alignItems: 'center', padding: '12px',
-                                background: feature.highlight ? 'rgba(255, 107, 53, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                borderRadius: '8px', border: feature.highlight ? '1px solid #ff6b35' : '1px solid transparent'
-                            }}>
-                                <span style={{ 
-                                    marginRight: '12px', fontSize: '20px',
-                                    filter: feature.highlight ? 'drop-shadow(0 0 8px #ff6b35)' : 'none'
-                                }}>
-                                    {feature.icon}
-                                </span>
-                                <span style={{ 
-                                    fontWeight: feature.highlight ? 'bold' : 'normal',
-                                    color: feature.highlight ? '#ff6b35' : 'white'
-                                }}>
-                                    {feature.text}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+        // Reset delay on successful call
+        this.rateLimitDelay = Math.max(this.rateLimitDelay * 0.9, 2000);
 
-                {/* CTA Section */}
-                <div style={{ textAlign: 'center' }}>
-                    <button 
-                        onClick={() => {
-                            window.open('https://www.paypal.com/paypalme/thediceyguy/39', '_blank');
-                            showToast('💎 Premium upgrade initiated via PayPal!', 'success');
-                        }}
-                        style={{
-                            padding: '16px 48px', border: 'none', borderRadius: '8px',
-                            background: 'linear-gradient(45deg, #4a90e2, #ff6b35)', color: 'white',
-                            fontSize: '20px', fontWeight: 'bold', cursor: 'pointer',
-                            boxShadow: '0 8px 32px rgba(74, 144, 226, 0.3)', marginBottom: '24px'
-                        }}>
-                        🚀 Start 7-Day Free Trial
-                    </button>
-                    
-                    <p style={{ opacity: 0.7, fontSize: '14px' }}>
-                        No credit card required • Cancel anytime • Full refund within 30 days
-                    </p>
-                </div>
+        const data = await response.json();
+        const responseText = data.candidates[0]?.content?.parts[0]?.text || '';
+        
+        return this.parseGeminiResponse(responseText);
+    }
 
-                {/* Ethical Promise */}
-                <div style={{
-                    background: 'rgba(40, 167, 69, 0.1)', border: '1px solid #28a745',
-                    borderRadius: '12px', padding: '24px', marginTop: '32px', textAlign: 'center'
-                }}>
-                    <h4 style={{ margin: '0 0 16px 0', color: '#28a745', fontSize: '20px' }}>
-                        ❤️ Our Promise: No Paywall to Play
-                    </h4>
-                    <p style={{ margin: 0, fontSize: '16px', lineHeight: '1.6' }}>
-                        MTG Scanner will always help you scan and build for free. Premium just unlocks 
-                        power tools for dedicated deckbuilders, collectors, and traders.
-                    </p>
-                </div>
+    parseGeminiResponse(responseText) {
+        if (!responseText || responseText.includes('NO_MTG_CARD')) {
+            return {
+                hasCard: false,
+                message: 'No MTG card detected',
+                confidence: 0
+            };
+        }
 
-                {/* Close Button */}
-                <button onClick={onClose}
-                    style={{
-                        position: 'absolute', top: '16px', right: '16px',
-                        background: 'transparent', border: 'none', color: '#94a3b8',
-                        fontSize: '24px', cursor: 'pointer'
-                    }}>
-                    ✕
-                </button>
-            </div>
-        </div>
-    );
-};
+        const lines = responseText.split('\n');
+        let cardName = '';
+        let confidence = 0;
+        let cardType = '';
+        let manaCost = '';
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('CARD_NAME:')) {
+                cardName = trimmed.replace('CARD_NAME:', '').trim();
+            } else if (trimmed.startsWith('CONFIDENCE:')) {
+                confidence = parseInt(trimmed.replace('CONFIDENCE:', '').trim()) || 0;
+            } else if (trimmed.startsWith('TYPE:')) {
+                cardType = trimmed.replace('TYPE:', '').trim();
+            } else if (trimmed.startsWith('MANA_COST:')) {
+                manaCost = trimmed.replace('MANA_COST:', '').trim();
+            }
+        }
+
+        if (!cardName || cardName.length < 3 || confidence < 80) {
+            return {
+                hasCard: false,
+                message: confidence < 80 ? `Low confidence: ${confidence}%` : 'Invalid card name detected',
+                confidence: confidence
+            };
+        }
+
+        return {
+            hasCard: true,
+            cardName,
+            confidence,
+            cardType,
+            manaCost,
+            method: 'gemini_vision'
+        };
+    }
+
+    async enhanceWithScryfall(result) {
+        try {
+            const encodedName = encodeURIComponent(result.cardName);
+            const response = await fetch(`https://api.scryfall.com/cards/named?exact=${encodedName}`);
+            
+            if (response.ok) {
+                const scryfallCard = await response.json();
+                return {
+                    ...result,
+                    cardType: scryfallCard.type_line,
+                    manaCost: scryfallCard.mana_cost || '',
+                    setInfo: scryfallCard.set_name,
+                    rarity: scryfallCard.rarity,
+                    scryfallId: scryfallCard.id,
+                    scryfallUri: scryfallCard.scryfall_uri,
+                    imageUri: scryfallCard.image_uris?.normal,
+                    prices: scryfallCard.prices,
+                    colors: scryfallCard.colors || [],
+                    setCode: scryfallCard.set,
+                    collectorNumber: scryfallCard.collector_number,
+                    isVerified: true
+                };
+            }
+        } catch (error) {
+            console.log('⚠️ Scryfall enhancement failed:', error.message);
+        }
+        
+        return result;
+    }
+}
 
 // 🔥 SMART COOLDOWN SYSTEM
 class MTGScannerCooldown {
@@ -901,14 +259,14 @@ class MTGScannerCooldown {
         this.lastDetectionTime = 0;
         this.lastApiCall = 0;
         this.consecutiveDetections = 0;
-        this.isEditionSelectorOpen = false;
         this.detectionBuffer = [];
         
-        this.SAME_CARD_COOLDOWN = 12000;
-        this.MIN_API_INTERVAL = 3000;
-        this.DETECTION_STABILITY = 2;
-        this.MAX_CONSECUTIVE = 3;
-        this.LONG_PAUSE_DURATION = 20000;
+        // Gentler cooldown settings
+        this.SAME_CARD_COOLDOWN = 8000;      // 8 seconds for same card
+        this.MIN_API_INTERVAL = 2000;        // 2 seconds between API calls
+        this.DETECTION_STABILITY = 2;        // Need 2 consistent detections
+        this.MAX_CONSECUTIVE = 3;            // Max consecutive before pause
+        this.LONG_PAUSE_DURATION = 15000;   // 15 second pause (reduced from 30)
         
         this.isLongPauseActive = false;
         this.longPauseStartTime = 0;
@@ -917,8 +275,7 @@ class MTGScannerCooldown {
     shouldScan(cardName = null) {
         const now = Date.now();
         
-        if (this.isEditionSelectorOpen) return false;
-        
+        // Check long pause
         if (this.isLongPauseActive) {
             const pauseRemaining = this.LONG_PAUSE_DURATION - (now - this.longPauseStartTime);
             if (pauseRemaining > 0) {
@@ -926,14 +283,21 @@ class MTGScannerCooldown {
             } else {
                 this.isLongPauseActive = false;
                 this.consecutiveDetections = 0;
+                console.log("✅ Long pause ended, scanning can resume");
             }
         }
         
-        if (now - this.lastApiCall < this.MIN_API_INTERVAL) return false;
+        // Enforce minimum API interval
+        if (now - this.lastApiCall < this.MIN_API_INTERVAL) {
+            return false;
+        }
         
+        // Same card cooldown
         if (cardName && cardName === this.lastDetectedCard) {
             const timeSinceLastDetection = now - this.lastDetectionTime;
-            if (timeSinceLastDetection < this.SAME_CARD_COOLDOWN) return false;
+            if (timeSinceLastDetection < this.SAME_CARD_COOLDOWN) {
+                return false;
+            }
         }
         
         return true;
@@ -941,10 +305,16 @@ class MTGScannerCooldown {
 
     addDetection(cardName, confidence) {
         const now = Date.now();
-        this.detectionBuffer.push({ cardName, confidence, timestamp: now });
-        this.detectionBuffer = this.detectionBuffer.filter(detection => now - detection.timestamp < 8000);
         
-        const recentSameCard = this.detectionBuffer.filter(detection => detection.cardName === cardName);
+        this.detectionBuffer.push({ cardName, confidence, timestamp: now });
+        this.detectionBuffer = this.detectionBuffer.filter(
+            detection => now - detection.timestamp < 8000
+        );
+        
+        const recentSameCard = this.detectionBuffer.filter(
+            detection => detection.cardName === cardName
+        );
+        
         return recentSameCard.length >= this.DETECTION_STABILITY;
     }
 
@@ -965,6 +335,7 @@ class MTGScannerCooldown {
         if (this.consecutiveDetections >= this.MAX_CONSECUTIVE) {
             this.isLongPauseActive = true;
             this.longPauseStartTime = now;
+            console.log(`🛑 Activating gentler pause (${this.LONG_PAUSE_DURATION/1000}s)`);
         }
     }
 
@@ -975,10 +346,6 @@ class MTGScannerCooldown {
         this.detectionBuffer = [];
         this.isLongPauseActive = false;
         this.longPauseStartTime = 0;
-    }
-
-    setEditionSelectorOpen(isOpen) {
-        this.isEditionSelectorOpen = isOpen;
     }
 
     getCooldownStatus() {
@@ -994,7 +361,6 @@ class MTGScannerCooldown {
             apiCooldown: Math.max(0, this.MIN_API_INTERVAL - (now - this.lastApiCall)),
             consecutiveDetections: this.consecutiveDetections,
             longPauseRemaining,
-            isEditionSelectorOpen: this.isEditionSelectorOpen,
             canScan: this.shouldScan(this.lastDetectedCard),
             detectionBufferSize: this.detectionBuffer.length,
             stabilityRequired: this.DETECTION_STABILITY
@@ -1002,158 +368,572 @@ class MTGScannerCooldown {
     }
 }
 
-// 🚀 MOCK VISION SERVICE FOR DEMO
-class MockVisionService {
-    constructor() {
-        this.mockCards = [
-            { cardName: "Lightning Bolt", confidence: 96, cardType: "Instant", setInfo: "Magic 2011", manaCost: "{R}", rarity: "common" },
-            { cardName: "Black Lotus", confidence: 98, cardType: "Artifact", setInfo: "Alpha", manaCost: "{0}", rarity: "rare" },
-            { cardName: "Force of Will", confidence: 94, cardType: "Instant", setInfo: "Alliances", manaCost: "{3}{U}{U}", rarity: "uncommon" },
-            { cardName: "Tarmogoyf", confidence: 97, cardType: "Creature — Lhurgoyf", setInfo: "Future Sight", manaCost: "{1}{G}", rarity: "rare" },
-            { cardName: "Snapcaster Mage", confidence: 95, cardType: "Creature — Human Wizard", setInfo: "Innistrad", manaCost: "{1}{U}", rarity: "rare" }
-        ];
-        this.lastScanTime = 0;
-        this.scanIndex = 0;
-    }
+// 🎨 PROFESSIONAL UI COMPONENTS
+const CooldownStatus = ({ cooldownStatus, isVisible }) => {
+    if (!isVisible || !cooldownStatus) return null;
 
-    async processVideoFrame(videoElement) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-        
-        const now = Date.now();
-        if (now - this.lastScanTime < 2000) {
-            return { hasCard: false, message: 'Scanning...' };
-        }
-
-        this.lastScanTime = now;
-        
-        // 70% chance of finding a card
-        if (Math.random() > 0.3) {
-            const card = this.mockCards[this.scanIndex % this.mockCards.length];
-            this.scanIndex++;
-            
-            return {
-                ...card,
-                hasCard: true,
-                timestamp: new Date().toISOString(),
-                prices: { usd: (Math.random() * 50 + 0.5).toFixed(2) },
-                colors: this.getRandomColors(),
-                scryfallUri: `https://scryfall.com/search?q=${encodeURIComponent(card.cardName)}`,
-                scryfallVerified: true
-            };
-        }
-        
-        return { hasCard: false, message: 'No card detected - position card clearly in view' };
-    }
-
-    getRandomColors() {
-        const colors = ['W', 'U', 'B', 'R', 'G'];
-        const numColors = Math.floor(Math.random() * 3) + 1;
-        return colors.sort(() => 0.5 - Math.random()).slice(0, numColors);
-    }
-}
-
-// 🔧 MOCK CAMERA FUNCTIONS
-const enumerateCamerasEnhanced = async () => {
-    // Simulate camera enumeration
-    return [
-        { deviceId: 'mock-camera-1', label: 'HD Pro Webcam C920 (Logitech)' },
-        { deviceId: 'mock-camera-2', label: 'Integrated Camera (Built-in)' },
-        { deviceId: 'mock-camera-3', label: 'Elgato Cam Link 4K (Virtual)' }
-    ];
-};
-
-const selectBestCamera = (cameras) => {
-    const logitechCamera = cameras.find(camera => 
-        camera.label.toLowerCase().includes('logitech') || 
-        camera.label.toLowerCase().includes('c920')
+    return (
+        <div style={{
+            position: 'absolute', top: '10px', right: '10px',
+            background: 'rgba(0,0,0,0.85)', color: 'white', padding: '12px',
+            borderRadius: '8px', fontSize: '11px', fontFamily: 'monospace',
+            border: '1px solid #4a90e2', minWidth: '200px', zIndex: 1000
+        }}>
+            <div style={{color: '#4a90e2', fontWeight: 'bold', marginBottom: '6px', textAlign: 'center'}}>
+                🔥 SCANNER STATUS
+            </div>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>API:</span>
+                <span style={{color: '#64b5f6'}}>{Math.ceil(cooldownStatus.apiCooldown / 1000)}s</span>
+            </div>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>Same Card:</span>
+                <span style={{color: '#64b5f6'}}>{Math.ceil(cooldownStatus.sameCardCooldown / 1000)}s</span>
+            </div>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                <span>Stability:</span>
+                <span style={{color: '#64b5f6'}}>{cooldownStatus.detectionBufferSize}/{cooldownStatus.stabilityRequired}</span>
+            </div>
+            <div style={{
+                marginTop: '6px', padding: '4px', 
+                background: cooldownStatus.canScan ? 'rgba(40, 167, 69, 0.3)' : 'rgba(220, 53, 69, 0.3)',
+                borderRadius: '4px', textAlign: 'center', fontWeight: 'bold'
+            }}>
+                {cooldownStatus.canScan ? '✅ Ready' : '⏳ Cooldown'}
+            </div>
+        </div>
     );
-    return logitechCamera ? logitechCamera.deviceId : cameras[0]?.deviceId;
 };
 
-const diagnoseCameraIssues = async () => {
-    console.log('🔍 CAMERA DIAGNOSTIC - Mock implementation for demo');
-    showToast('🔍 Camera diagnostics completed successfully!', 'info');
+const TabNavigation = ({ activeTab, onTabChange, savedCards }) => {
+    const tabs = [
+        { id: 'scanner', label: '🔍 Scanner', badge: null },
+        { id: 'collection', label: '🃏 Collection', badge: savedCards?.length || 0 },
+        { id: 'history', label: '📊 History', badge: null }
+    ];
+
+    return (
+        <div style={{
+            display: 'flex', gap: '4px', marginBottom: '20px',
+            background: 'rgba(255, 255, 255, 0.05)', padding: '4px',
+            borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+            {tabs.map(tab => (
+                <button key={tab.id} onClick={() => onTabChange(tab.id)}
+                    style={{
+                        flex: 1, padding: '12px 16px', border: 'none',
+                        background: activeTab === tab.id ? 'linear-gradient(45deg, #4a90e2, #64b5f6)' : 'transparent',
+                        color: activeTab === tab.id ? 'white' : '#94a3b8',
+                        borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                        transition: 'all 0.2s ease'
+                    }}>
+                    <span>{tab.label}</span>
+                    {tab.badge !== null && (
+                        <span style={{
+                            background: 'rgba(74, 144, 226, 0.2)', color: '#4a90e2',
+                            padding: '2px 6px', borderRadius: '10px', fontSize: '11px', fontWeight: '700'
+                        }}>{tab.badge}</span>
+                    )}
+                </button>
+            ))}
+        </div>
+    );
 };
 
-// 🔥 MAIN SCANNER COMPONENT - COMPLETE MERGED VERSION
+// 📱 COLLECTION MANAGER
+const CollectionManager = ({ savedCards, onRemoveCard, onOpenScryfall, onExportToMoxfield }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortBy, setSortBy] = useState('name');
+    const [viewMode, setViewMode] = useState('grid');
+
+    const filteredAndSortedCards = savedCards
+        .filter(card => 
+            card.cardName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (card.cardType && card.cardType.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (card.setInfo && card.setInfo.toLowerCase().includes(searchTerm.toLowerCase()))
+        )
+        .sort((a, b) => {
+            switch (sortBy) {
+                case 'name': return a.cardName.localeCompare(b.cardName);
+                case 'type': return (a.cardType || '').localeCompare(b.cardType || '');
+                case 'set': return (a.setInfo || '').localeCompare(b.setInfo || '');
+                case 'date': return new Date(b.addedAt) - new Date(a.addedAt);
+                case 'confidence': return (b.confidence || 0) - (a.confidence || 0);
+                default: return 0;
+            }
+        });
+
+    const getTotalValue = () => {
+        return savedCards.reduce((total, card) => {
+            const price = parseFloat(card.prices?.usd || 0);
+            return total + price;
+        }, 0).toFixed(2);
+    };
+
+    const getColorDistribution = () => {
+        const colors = {};
+        savedCards.forEach(card => {
+            if (card.colors && Array.isArray(card.colors)) {
+                card.colors.forEach(color => {
+                    colors[color] = (colors[color] || 0) + 1;
+                });
+            }
+        });
+        return colors;
+    };
+
+    const colorSymbols = { W: '⚪', U: '🔵', B: '⚫', R: '🔴', G: '🟢' };
+
+    return (
+        <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+                <h2 style={{ color: '#4a90e2', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    🃏 Collection ({savedCards.length} cards)
+                    {savedCards.length > 0 && (
+                        <span style={{ fontSize: '16px', color: '#22c55e', fontWeight: 'normal' }}>
+                            ~ ${getTotalValue()}
+                        </span>
+                    )}
+                </h2>
+                
+                <button onClick={onExportToMoxfield} disabled={savedCards.length === 0}
+                    style={{
+                        padding: '10px 20px', background: 'linear-gradient(45deg, #22c55e, #16a34a)',
+                        border: 'none', color: 'white', borderRadius: '8px',
+                        cursor: savedCards.length === 0 ? 'not-allowed' : 'pointer',
+                        fontSize: '14px', fontWeight: '600',
+                        opacity: savedCards.length === 0 ? 0.5 : 1,
+                        transition: 'all 0.2s ease'
+                    }}>
+                    📤 Export to Moxfield
+                </button>
+            </div>
+
+            {/* Color Distribution */}
+            {savedCards.length > 0 && (
+                <div style={{
+                    background: 'rgba(255, 255, 255, 0.05)', padding: '16px', borderRadius: '12px',
+                    marginBottom: '20px', border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                    <h4 style={{ color: '#e2e8f0', marginBottom: '12px', fontSize: '14px' }}>🎨 Color Distribution</h4>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                        {Object.entries(getColorDistribution()).map(([color, count]) => (
+                            <div key={color} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '16px' }}>{colorSymbols[color] || '⚪'}</span>
+                                <span style={{ color: '#94a3b8', fontSize: '14px' }}>{count}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Search and Filter Controls */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <input type="text" placeholder="🔍 Search cards..." value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{
+                        padding: '10px 14px', background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
+                        color: 'white', fontSize: '14px', minWidth: '200px',
+                        outline: 'none'
+                    }} />
+                
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
+                    style={{
+                        padding: '10px 14px', background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
+                        color: 'white', fontSize: '14px', outline: 'none'
+                    }}>
+                    <option value="name">Sort by Name</option>
+                    <option value="type">Sort by Type</option>
+                    <option value="set">Sort by Set</option>
+                    <option value="date">Sort by Date Added</option>
+                    <option value="confidence">Sort by Confidence</option>
+                </select>
+
+                <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                    style={{
+                        padding: '10px 16px', background: 'rgba(74, 144, 226, 0.2)',
+                        border: '1px solid #4a90e2', color: '#4a90e2', borderRadius: '8px',
+                        cursor: 'pointer', fontSize: '14px', fontWeight: '600'
+                    }}>
+                    {viewMode === 'grid' ? '📋 List' : '🔲 Grid'}
+                </button>
+            </div>
+
+            {/* Cards Display */}
+            {filteredAndSortedCards.length === 0 ? (
+                <div style={{
+                    textAlign: 'center', padding: '60px 20px',
+                    background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px',
+                    border: '1px dashed rgba(255, 255, 255, 0.1)'
+                }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🃏</div>
+                    <h3 style={{ color: '#e2e8f0', marginBottom: '8px' }}>
+                        {searchTerm ? 'No matching cards found' : 'No Cards in Collection'}
+                    </h3>
+                    <p style={{ color: '#94a3b8' }}>
+                        {searchTerm ? 'Try a different search term' : 'Start scanning cards to build your collection'}
+                    </p>
+                </div>
+            ) : (
+                <div style={{
+                    display: viewMode === 'grid' ? 'grid' : 'block',
+                    gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(300px, 1fr))' : '1fr',
+                    gap: '16px'
+                }}>
+                    {filteredAndSortedCards.map((card, index) => (
+                        <div key={card.id || index}
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.05)', padding: '20px', borderRadius: '12px',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                display: viewMode === 'list' ? 'flex' : 'block',
+                                alignItems: viewMode === 'list' ? 'center' : 'stretch',
+                                gap: viewMode === 'list' ? '20px' : '0',
+                                transition: 'all 0.2s ease',
+                                ':hover': { transform: 'translateY(-2px)' }
+                            }}>
+                            
+                            <div style={{ flex: viewMode === 'list' ? '1' : 'auto' }}>
+                                <h4 style={{ 
+                                    color: '#4a90e2', marginBottom: '12px', fontSize: '18px',
+                                    display: 'flex', alignItems: 'center', gap: '8px'
+                                }}>
+                                    {card.cardName}
+                                    {card.isVerified && <span style={{fontSize: '12px'}}>✅</span>}
+                                </h4>
+                                
+                                <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '12px', lineHeight: '1.5' }}>
+                                    {card.cardType && <div><strong>Type:</strong> {card.cardType}</div>}
+                                    {card.setInfo && <div><strong>Set:</strong> {card.setInfo}</div>}
+                                    {card.manaCost && <div><strong>Mana:</strong> {card.manaCost}</div>}
+                                    {card.rarity && <div><strong>Rarity:</strong> {card.rarity}</div>}
+                                    {card.prices?.usd && <div><strong>Price:</strong> ${card.prices.usd}</div>}
+                                    <div><strong>Confidence:</strong> {card.confidence}%</div>
+                                    {card.addedAt && <div><strong>Added:</strong> {new Date(card.addedAt).toLocaleDateString()}</div>}
+                                </div>
+                            </div>
+                            
+                            <div style={{ 
+                                display: 'flex', gap: '8px', flexDirection: viewMode === 'list' ? 'row' : 'column',
+                                marginTop: viewMode === 'grid' ? '16px' : '0'
+                            }}>
+                                {card.scryfallUri && (
+                                    <button onClick={() => onOpenScryfall(card)}
+                                        style={{
+                                            padding: '8px 16px', background: 'rgba(74, 144, 226, 0.2)',
+                                            border: '1px solid #4a90e2', color: '#4a90e2', borderRadius: '6px',
+                                            cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                                            transition: 'all 0.2s ease'
+                                        }}>
+                                        🔗 Scryfall
+                                    </button>
+                                )}
+                                <button onClick={() => onRemoveCard(card.id)}
+                                    style={{
+                                        padding: '8px 16px', background: 'rgba(220, 53, 69, 0.2)',
+                                        border: '1px solid #dc3545', color: '#dc3545', borderRadius: '6px',
+                                        cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                                        transition: 'all 0.2s ease'
+                                    }}>
+                                    🗑️ Remove
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// 📊 SCAN HISTORY VIEWER
+const ScanHistoryViewer = ({ scanHistory, onSaveCard }) => {
+    const [sortBy, setSortBy] = useState('date');
+
+    const sortedHistory = [...scanHistory].sort((a, b) => {
+        switch (sortBy) {
+            case 'name': return a.cardName.localeCompare(b.cardName);
+            case 'confidence': return b.confidence - a.confidence;
+            case 'date': return new Date(b.timestamp) - new Date(a.timestamp);
+            default: return 0;
+        }
+    });
+
+    return (
+        <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ color: '#4a90e2', margin: 0 }}>📊 Scan History ({scanHistory.length})</h2>
+                
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
+                    style={{
+                        padding: '8px 12px', background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '6px',
+                        color: 'white', fontSize: '14px'
+                    }}>
+                    <option value="date">Sort by Date</option>
+                    <option value="name">Sort by Name</option>
+                    <option value="confidence">Sort by Confidence</option>
+                </select>
+            </div>
+
+            {sortedHistory.length === 0 ? (
+                <div style={{
+                    textAlign: 'center', padding: '60px 20px',
+                    background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px',
+                    border: '1px dashed rgba(255, 255, 255, 0.1)'
+                }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
+                    <h3 style={{ color: '#e2e8f0', marginBottom: '8px' }}>No Scan History</h3>
+                    <p style={{ color: '#94a3b8' }}>Start scanning cards to see your history here</p>
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gap: '12px' }}>
+                    {sortedHistory.map((card, index) => (
+                        <div key={index}
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.05)', padding: '16px', borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                            }}>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                                    <span style={{ color: '#4a90e2', fontWeight: '600', fontSize: '16px' }}>
+                                        {card.cardName}
+                                    </span>
+                                    <span style={{ 
+                                        color: card.confidence >= 95 ? '#22c55e' : card.confidence >= 85 ? '#f59e0b' : '#ef4444',
+                                        fontSize: '14px', fontWeight: '600'
+                                    }}>
+                                        {card.confidence}%
+                                    </span>
+                                    {card.isVerified && <span style={{fontSize: '12px'}}>✅</span>}
+                                </div>
+                                <div style={{ fontSize: '13px', color: '#94a3b8' }}>
+                                    {card.cardType && <span>{card.cardType} • </span>}
+                                    {card.setInfo && <span>{card.setInfo} • </span>}
+                                    <span>{new Date(card.timestamp).toLocaleString()}</span>
+                                </div>
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {card.scryfallUri && (
+                                    <button onClick={() => window.open(card.scryfallUri, '_blank')}
+                                        style={{
+                                            padding: '6px 12px', background: 'rgba(74, 144, 226, 0.2)',
+                                            border: '1px solid #4a90e2', color: '#4a90e2', borderRadius: '4px',
+                                            cursor: 'pointer', fontSize: '12px'
+                                        }}>
+                                        🔗
+                                    </button>
+                                )}
+                                <button onClick={() => onSaveCard(card)}
+                                    style={{
+                                        padding: '6px 12px', background: 'rgba(34, 197, 94, 0.2)',
+                                        border: '1px solid #22c55e', color: '#22c55e', borderRadius: '4px',
+                                        cursor: 'pointer', fontSize: '12px'
+                                    }}>
+                                    💾
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// 🎥 MAIN SCANNER COMPONENT
 const Scanner = () => {
     // Core scanner state
     const [isScanning, setIsScanning] = useState(false);
     const [scanResult, setScanResult] = useState(null);
-    const [cameraStatus, setCameraStatus] = useState('ready'); // Mock as ready
+    const [cameraStatus, setCameraStatus] = useState('initializing');
     const [currentCard, setCurrentCard] = useState(null);
     const [scanMode, setScanMode] = useState('continuous');
     
-    // User preference toggles
-    const [skipEditionSelection, setSkipEditionSelection] = useState(false);
-    const [skipBasicLands, setSkipBasicLands] = useState(false);
-    const [autoSaveToCollection, setAutoSaveToCollection] = useState(true);
-    
-    // Cooldown system state
-    const [cooldownStatus, setCooldownStatus] = useState({});
+    // Collection and history state
+    const [savedCards, setSavedCards] = useState([]);
+    const [scanHistory, setScanHistory] = useState([]);
+    const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
     
     // UI state
     const [activeTab, setActiveTab] = useState('scanner');
-    const [scanHistory, setScanHistory] = useState([]);
-    const [savedCards, setSavedCards] = useState([]);
-    const [showPremiumModal, setShowPremiumModal] = useState(false);
-    
-    // Edition selection state
-    const [showEditionSelector, setShowEditionSelector] = useState(false);
-    const [availableEditions, setAvailableEditions] = useState([]);
-    const [pendingCardData, setPendingCardData] = useState(null);
-    const [scanningPausedForSelection, setScanningPausedForSelection] = useState(false);
+    const [cooldownStatus, setCooldownStatus] = useState({});
     
     // Camera state
     const [availableCameras, setAvailableCameras] = useState([]);
     const [selectedCameraId, setSelectedCameraId] = useState(null);
-    
-    // Premium features
-    const [isPremiumUser, setIsPremiumUser] = useState(false);
-    const FREE_COLLECTION_LIMIT = 100;
+    const [cameraError, setCameraError] = useState(null);
     
     // Refs
+    const videoRef = useRef(null);
     const scanIntervalRef = useRef(null);
-    const visionServiceRef = useRef(new MockVisionService());
+    const visionServiceRef = useRef(null);
+    const cameraStreamRef = useRef(null);
     const cooldownSystemRef = useRef(new MTGScannerCooldown());
 
     // Initialize
     useEffect(() => {
-        console.log('🔧 Initializing MTG Scanner Pro - Complete Merged Version...');
+        console.log('🚀 Initializing MTG Scanner Pro...');
+        initializeServices();
+        loadSavedData();
+        enumerateCameras().then(() => setupCamera());
         
-        // Initialize camera system
-        enumerateCamerasEnhanced().then(cameras => {
-            setAvailableCameras(cameras);
-            const bestCamera = selectBestCamera(cameras);
-            setSelectedCameraId(bestCamera);
-        });
-        
-        // Load saved data
-        const saved = localStorage.getItem('mtg_saved_cards');
-        if (saved) setSavedCards(JSON.parse(saved));
-        
-        const premium = localStorage.getItem('mtg_premium_status');
-        if (premium === 'true') setIsPremiumUser(true);
-        
-        // Cooldown status updates
         const cooldownUpdateInterval = setInterval(() => {
             setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
         }, 500);
         
-        return () => clearInterval(cooldownUpdateInterval);
+        return () => {
+            console.log('🧹 Cleaning up...');
+            clearInterval(cooldownUpdateInterval);
+            cleanup();
+        };
     }, []);
 
+    const initializeServices = () => {
+        try {
+            visionServiceRef.current = new GeminiVisionService();
+            console.log('✅ Gemini Vision Service initialized');
+        } catch (error) {
+            console.error('❌ Service initialization failed:', error);
+            showToast('Failed to initialize vision service', 'error');
+        }
+    };
+
+    const loadSavedData = () => {
+        try {
+            // Load saved cards
+            const savedCardsData = localStorage.getItem('mtg_saved_cards');
+            if (savedCardsData) {
+                setSavedCards(JSON.parse(savedCardsData));
+                console.log('📁 Loaded saved cards from storage');
+            }
+            
+            // Load scan history
+            const historyData = localStorage.getItem('mtg_scan_history');
+            if (historyData) {
+                setScanHistory(JSON.parse(historyData));
+                console.log('📊 Loaded scan history from storage');
+            }
+            
+            // Load preferences
+            const autoSavePref = localStorage.getItem('mtg_auto_save');
+            if (autoSavePref) {
+                setAutoSaveEnabled(JSON.parse(autoSavePref));
+            }
+        } catch (error) {
+            console.error('❌ Failed to load saved data:', error);
+        }
+    };
+
+    const enumerateCameras = async () => {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            console.log('📷 Available cameras:', videoDevices.length);
+            setAvailableCameras(videoDevices);
+            
+            // Smart camera prioritization - favor Logitech C920
+            const logitechCamera = videoDevices.find(device => 
+                device.label.toLowerCase().includes('logitech') || 
+                device.label.toLowerCase().includes('c920')
+            );
+            
+            if (logitechCamera) {
+                setSelectedCameraId(logitechCamera.deviceId);
+                console.log('✅ Auto-selected Logitech C920');
+                showToast('🎥 Logitech C920 detected - optimal for MTG scanning!', 'success');
+            } else if (videoDevices.length > 0) {
+                // Filter out virtual cameras if possible
+                const physicalCameras = videoDevices.filter(device => 
+                    !device.label.toLowerCase().includes('virtual') &&
+                    !device.label.toLowerCase().includes('obs') &&
+                    !device.label.toLowerCase().includes('elgato')
+                );
+                
+                if (physicalCameras.length > 0) {
+                    setSelectedCameraId(physicalCameras[0].deviceId);
+                    console.log('✅ Auto-selected physical camera');
+                } else {
+                    setSelectedCameraId(videoDevices[0].deviceId);
+                    console.log('⚠️ Using virtual camera (may have quality issues)');
+                }
+            }
+        } catch (error) {
+            console.error('❌ Failed to enumerate cameras:', error);
+            showToast('Failed to detect cameras', 'error');
+        }
+    };
+
+    const setupCamera = async (deviceId = null) => {
+        console.log('🎥 Setting up camera...');
+        setCameraStatus('requesting');
+        setCameraError(null);
+        
+        try {
+            if (cameraStreamRef.current && cameraStreamRef.current.active) {
+                console.log('📷 Camera already active');
+                if (videoRef.current && !videoRef.current.srcObject) {
+                    videoRef.current.srcObject = cameraStreamRef.current;
+                    videoRef.current.play();
+                }
+                setCameraStatus('ready');
+                return;
+            }
+
+            const useDeviceId = deviceId || selectedCameraId;
+            let constraints = {
+                video: {
+                    deviceId: useDeviceId ? { exact: useDeviceId } : undefined,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    frameRate: { ideal: 30 }
+                },
+                audio: false
+            };
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            cameraStreamRef.current = stream;
+            
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.onloadedmetadata = () => {
+                    videoRef.current.play();
+                    setCameraStatus('ready');
+                    setCameraError(null);
+                    console.log('✅ Camera ready:', `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
+                    showToast('📷 Camera ready for MTG scanning!', 'success');
+                };
+            }
+        } catch (error) {
+            console.error('❌ Camera setup failed:', error);
+            setCameraStatus('error');
+            setCameraError({
+                message: error.name === 'NotAllowedError' ? 'Camera permission denied' : 
+                         error.name === 'NotFoundError' ? 'No camera found' :
+                         error.name === 'NotReadableError' ? 'Camera is busy' : 'Camera error',
+                action: error.name === 'NotAllowedError' ? 'Please allow camera access and try again' :
+                        error.name === 'NotFoundError' ? 'Please connect a camera' :
+                        'Please check camera and try again',
+                canRetry: true
+            });
+            showToast('Camera setup failed', 'error');
+        }
+    };
+
     const startScanning = () => {
-        if (cameraStatus !== 'ready') {
-            showToast('❌ Camera not ready. Please check camera status.', 'error');
+        if (!visionServiceRef.current || cameraStatus !== 'ready') {
+            console.log('⚠️ Scanner not ready');
+            showToast('Camera not ready. Please wait for camera initialization.', 'error');
             return;
         }
         
-        console.log(`▶️ Starting MTG Scanner - ${scanMode} mode...`);
+        console.log(`▶️ Starting ${scanMode} scanning...`);
         setIsScanning(true);
-        setScanningPausedForSelection(false);
-        
         cooldownSystemRef.current.resetCooldowns();
         setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
         
@@ -1161,47 +941,40 @@ const Scanner = () => {
             try {
                 const currentCardName = currentCard?.cardName;
                 
+                // Check cooldown system
                 if (!cooldownSystemRef.current.shouldScan(currentCardName)) {
                     setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
                     return;
                 }
 
-                if (scanningPausedForSelection || showEditionSelector) {
-                    cooldownSystemRef.current.setEditionSelectorOpen(true);
-                    return;
-                } else {
-                    cooldownSystemRef.current.setEditionSelectorOpen(false);
-                }
-
-                console.log("🔄 Processing frame for MTG card...");
-                const result = await visionServiceRef.current.processVideoFrame();
+                console.log("🔄 Processing frame...");
+                const result = await visionServiceRef.current.processVideoFrame(videoRef.current);
                 
                 if (result && result.hasCard && result.confidence >= 85) {
-                    // Check if basic land and user wants to skip
-                    if (skipBasicLands && isBasicLand(result.cardName)) {
-                        console.log('⏩ Skipping basic land due to user preference');
-                        setScanResult({ 
-                            hasCard: false, 
-                            message: `Skipped basic land: ${result.cardName} (toggle to include basic lands)` 
-                        });
-                        return;
-                    }
+                    console.log(`🎯 Card detected: ${result.cardName} (${result.confidence}%)`);
                     
-                    console.log(`🎯 High-confidence detection: ${result.cardName} (${result.confidence}%)`);
-                    
+                    // Check stability
                     const isStable = cooldownSystemRef.current.addDetection(result.cardName, result.confidence);
                     
                     if (isStable) {
-                        console.log('✅ Card detection is STABLE, processing...');
+                        console.log('✅ Detection stable, processing...');
                         
                         cooldownSystemRef.current.recordDetection(result.cardName);
                         setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
                         
+                        // Stop scanning in single mode
                         if (scanMode === 'single') {
                             stopScanning();
                         }
                         
-                        await handleCardDetection(result);
+                        // Display card and add to history
+                        displayCard(result);
+                        addToScanHistory(result);
+                        
+                        // Auto-save if enabled
+                        if (autoSaveEnabled) {
+                            await saveCardToCollection(result);
+                        }
                     }
                     
                 } else if (result && !result.hasCard) {
@@ -1213,105 +986,14 @@ const Scanner = () => {
                 
             } catch (error) {
                 console.error('❌ Scanning error:', error);
-                setScanResult({ hasCard: false, message: 'Scanner error - please try again' });
+                setScanResult({ hasCard: false, message: `Scanner error: ${error.message}` });
             }
         }, scanMode === 'single' ? 1500 : 2500);
     };
 
-    const isBasicLand = (cardName) => {
-        const basicLands = ['Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Wastes'];
-        return basicLands.some(basic => cardName.toLowerCase().includes(basic.toLowerCase()));
-    };
-
-    const handleCardDetection = async (detectedCard) => {
-        // Simulate multiple editions (sometimes)
-        if (!skipEditionSelection && Math.random() > 0.7) {
-            console.log('🎭 Multiple editions found - showing selector');
-            setScanningPausedForSelection(true);
-            cooldownSystemRef.current.setEditionSelectorOpen(true);
-            
-            // Mock editions
-            const mockEditions = [
-                { set_name: 'Magic 2011', set: 'M11', released_at: '2010-07-16' },
-                { set_name: 'Magic 2010', set: 'M10', released_at: '2009-07-17' },
-                { set_name: 'Tenth Edition', set: '10E', released_at: '2007-07-13' }
-            ];
-            
-            setPendingCardData(detectedCard);
-            setAvailableEditions(mockEditions);
-            setShowEditionSelector(true);
-            
-            setScanResult(null);
-            setCurrentCard(null);
-            return;
-        }
-        
-        displayCard(detectedCard);
-        
-        if (autoSaveToCollection) {
-            await saveCardToCollection(detectedCard);
-            showToast(`💾 Saved: ${detectedCard.cardName} to collection!`, 'success');
-        }
-    };
-
-    const handleEditionSelected = async (selectedEdition) => {
-        if (pendingCardData && selectedEdition) {
-            const enhancedCard = { ...pendingCardData, setInfo: selectedEdition.set_name, setCode: selectedEdition.set };
-            displayCard(enhancedCard);
-            
-            if (autoSaveToCollection) {
-                await saveCardToCollection(enhancedCard);
-                showToast(`💾 Saved: ${enhancedCard.cardName} to collection!`, 'success');
-            }
-        }
-        
-        setShowEditionSelector(false);
-        setAvailableEditions([]);
-        setPendingCardData(null);
-        setScanningPausedForSelection(false);
-        cooldownSystemRef.current.setEditionSelectorOpen(false);
-        setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
-    };
-
-    const handleEditionCancelled = async () => {
-        if (pendingCardData) {
-            displayCard(pendingCardData);
-            
-            if (autoSaveToCollection) {
-                await saveCardToCollection(pendingCardData);
-                showToast(`💾 Saved: ${pendingCardData.cardName} to collection!`, 'success');
-            }
-        }
-        
-        setShowEditionSelector(false);
-        setAvailableEditions([]);
-        setPendingCardData(null);
-        setScanningPausedForSelection(false);
-        cooldownSystemRef.current.setEditionSelectorOpen(false);
-        setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
-    };
-
-    const displayCard = (card) => {
-        setCurrentCard(card);
-        setScanResult(card);
-        
-        setScanHistory(prev => {
-            const isDuplicate = prev.some(historyCard => 
-                historyCard.cardName === card.cardName && 
-                Math.abs(new Date(historyCard.timestamp) - new Date(card.timestamp)) < 5000
-            );
-            
-            if (!isDuplicate) {
-                return [card, ...prev.slice(0, 19)];
-            }
-            return prev;
-        });
-    };
-
     const stopScanning = () => {
-        console.log('⏹️ Stopping MTG Scanner...');
+        console.log('⏹️ Stopping scanner...');
         setIsScanning(false);
-        setScanningPausedForSelection(false);
         
         if (scanIntervalRef.current) {
             clearInterval(scanIntervalRef.current);
@@ -1319,71 +1001,113 @@ const Scanner = () => {
         }
     };
 
+    const displayCard = (card) => {
+        setCurrentCard(card);
+        setScanResult(card);
+        showToast(`✅ ${card.cardName} recognized (${card.confidence}%)`, 'success');
+    };
+
+    const addToScanHistory = (card) => {
+        const historyEntry = {
+            ...card,
+            id: Date.now() + Math.random(),
+            timestamp: new Date().toISOString()
+        };
+        
+        setScanHistory(prev => {
+            const newHistory = [historyEntry, ...prev.slice(0, 99)]; // Keep last 100
+            localStorage.setItem('mtg_scan_history', JSON.stringify(newHistory));
+            return newHistory;
+        });
+    };
+
     const saveCardToCollection = async (card) => {
         try {
-            if (!isPremiumUser && savedCards.length >= FREE_COLLECTION_LIMIT) {
-                showToast('🚨 Free collection limit reached! Upgrade to Premium for unlimited storage.', 'warning');
-                setShowPremiumModal(true);
-                return false;
-            }
-            
             const cardWithId = {
                 ...card,
                 id: Date.now() + Math.random(),
-                addedAt: new Date().toISOString(),
-                scannedAt: new Date().toLocaleString()
+                addedAt: new Date().toISOString()
             };
             
-            const updatedCards = [cardWithId, ...savedCards];
-            setSavedCards(updatedCards);
-            localStorage.setItem('mtg_saved_cards', JSON.stringify(updatedCards));
+            setSavedCards(prev => {
+                const newCollection = [cardWithId, ...prev];
+                localStorage.setItem('mtg_saved_cards', JSON.stringify(newCollection));
+                return newCollection;
+            });
             
             console.log('💾 Card saved to collection:', card.cardName);
+            showToast(`💾 ${card.cardName} saved to collection!`, 'success');
             return true;
-            
         } catch (error) {
             console.error('❌ Failed to save card:', error);
-            showToast(`❌ Failed to save ${card.cardName}`, 'error');
+            showToast(`Failed to save ${card.cardName}`, 'error');
             return false;
         }
     };
 
     const removeCardFromCollection = (cardId) => {
-        try {
-            const updatedCards = savedCards.filter(card => card.id !== cardId);
-            setSavedCards(updatedCards);
-            localStorage.setItem('mtg_saved_cards', JSON.stringify(updatedCards));
-            showToast('🗑️ Card removed from collection', 'info');
-        } catch (error) {
-            console.error('❌ Failed to remove card:', error);
-        }
+        setSavedCards(prev => {
+            const newCollection = prev.filter(card => card.id !== cardId);
+            localStorage.setItem('mtg_saved_cards', JSON.stringify(newCollection));
+            return newCollection;
+        });
+        showToast('Card removed from collection', 'info');
     };
 
     const openCardInScryfall = (card) => {
-        if (card && card.cardName) {
+        if (card.scryfallUri) {
+            window.open(card.scryfallUri, '_blank');
+        } else {
             const searchUrl = `https://scryfall.com/search?q=${encodeURIComponent(card.cardName)}`;
             window.open(searchUrl, '_blank');
         }
+        console.log('🔗 Opening Scryfall for:', card.cardName);
     };
 
-    const handleCameraSwitch = async (newCameraId) => {
-        console.log('🔄 Switching to camera:', newCameraId);
+    const exportToMoxfield = () => {
+        if (savedCards.length === 0) {
+            showToast('No cards in collection to export', 'error');
+            return;
+        }
+        
+        const moxfieldFormat = savedCards.map(card => `1 ${card.cardName}`).join('\n');
+        const blob = new Blob([moxfieldFormat], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'mtg_collection_moxfield.txt';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('📤 Collection exported to Moxfield format!', 'success');
+    };
+
+    const cleanup = () => {
+        stopScanning();
+        
+        if (cameraStreamRef.current) {
+            cameraStreamRef.current.getTracks().forEach(track => track.stop());
+            cameraStreamRef.current = null;
+        }
+    };
+
+    const handleCameraChange = async (newCameraId) => {
+        console.log('🔄 Switching camera:', newCameraId);
+        
+        // Stop current stream
+        if (cameraStreamRef.current) {
+            cameraStreamRef.current.getTracks().forEach(track => track.stop());
+            cameraStreamRef.current = null;
+        }
+        
         setSelectedCameraId(newCameraId);
-        showToast('📷 Camera switched successfully!', 'success');
+        await setupCamera(newCameraId);
+        showToast('📷 Camera switched!', 'success');
     };
 
     const refreshCameraList = async () => {
         console.log('🔄 Refreshing camera list...');
-        const cameras = await enumerateCamerasEnhanced();
-        setAvailableCameras(cameras);
+        await enumerateCameras();
         showToast('📷 Camera list refreshed!', 'success');
-    };
-
-    const handlePremiumUpgrade = () => {
-        setIsPremiumUser(true);
-        localStorage.setItem('mtg_premium_status', 'true');
-        setShowPremiumModal(false);
-        showToast('💎 Premium upgrade successful! Unlimited collection storage activated.', 'success');
     };
 
     return (
@@ -1404,8 +1128,7 @@ const Scanner = () => {
                         background: 'linear-gradient(45deg, #4a90e2, #64b5f6)',
                         borderRadius: '12px', display: 'flex', flexDirection: 'column',
                         alignItems: 'center', justifyContent: 'center',
-                        fontWeight: 'bold', fontSize: '12px', textAlign: 'center', lineHeight: '1.1',
-                        boxShadow: '0 4px 15px rgba(74, 144, 226, 0.3)'
+                        fontWeight: 'bold', fontSize: '12px', textAlign: 'center', lineHeight: '1.1'
                     }}>MTG<br/>SCAN</div>
                     <div>
                         <h1 style={{
@@ -1415,7 +1138,7 @@ const Scanner = () => {
                             backgroundClip: 'text', marginBottom: '5px'
                         }}>MTG Scanner Pro</h1>
                         <span style={{ fontSize: '0.9rem', color: '#b0bec5' }}>
-                            🔥 Complete Merged System • All Features Included • Production Ready
+                            🧠 Gemini AI • 📊 Scryfall Database • 🔥 Smart Cooldown
                         </span>
                     </div>
                 </div>
@@ -1423,23 +1146,25 @@ const Scanner = () => {
                 <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                     <div style={{
                         background: 'rgba(74, 144, 226, 0.1)', padding: '8px 12px',
-                        borderRadius: '20px', border: '1px solid rgba(74, 144, 226, 0.3)', fontSize: '0.85rem'
+                        borderRadius: '20px', border: '1px solid rgba(74, 144, 226, 0.3)',
+                        fontSize: '0.85rem'
                     }}>
-                        <span style={{ color: '#94a3b8' }}>Collection: </span>
-                        <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{savedCards.length}/{FREE_COLLECTION_LIMIT}</span>
+                        <span style={{ color: '#94a3b8' }}>History: </span>
+                        <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{scanHistory.length}</span>
                     </div>
                     <div style={{
                         background: 'rgba(74, 144, 226, 0.1)', padding: '8px 12px',
-                        borderRadius: '20px', border: '1px solid rgba(74, 144, 226, 0.3)', fontSize: '0.85rem'
+                        borderRadius: '20px', border: '1px solid rgba(74, 144, 226, 0.3)',
+                        fontSize: '0.85rem'
                     }}>
-                        <span style={{ color: '#94a3b8' }}>Status: </span>
-                        <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{isPremiumUser ? '💎 Premium' : '🆓 Free'}</span>
+                        <span style={{ color: '#94a3b8' }}>Collection: </span>
+                        <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{savedCards.length}</span>
                     </div>
                 </div>
             </div>
 
             {/* Tab Navigation */}
-            <ProfessionalTabs
+            <TabNavigation
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
                 savedCards={savedCards}
@@ -1451,265 +1176,249 @@ const Scanner = () => {
                 {/* Scanner Tab */}
                 {activeTab === 'scanner' && (
                     <>
-                        {/* User Preference Toggles */}
+                        {/* Scanner Settings */}
                         <div style={{
                             background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '15px', padding: '20px'
+                            border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '15px',
+                            padding: '20px'
                         }}>
                             <h3 style={{ color: '#4a90e2', marginBottom: '16px' }}>⚙️ Scanner Settings</h3>
                             
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
-                                {[
-                                    ['autoSaveToCollection', '💾 Auto-save to Collection', 'Automatically save detected cards', autoSaveToCollection, setAutoSaveToCollection],
-                                    ['skipEditionSelection', '🎭 Skip Edition Selection', 'Use first edition found for faster scanning', skipEditionSelection, setSkipEditionSelection],
-                                    ['skipBasicLands', '🏔️ Skip Basic Lands', 'Ignore Plains, Island, Swamp, Mountain, Forest', skipBasicLands, setSkipBasicLands]
-                                ].map(([key, title, desc, value, setter]) => (
-                                    <label key={key} style={{ 
-                                        display: 'flex', alignItems: 'center', gap: '12px', 
-                                        cursor: 'pointer', padding: '12px', background: 'rgba(255, 255, 255, 0.05)',
-                                        borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)'
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                                <div>
+                                    <label style={{ color: '#b0bec5', marginBottom: '8px', display: 'block' }}>
+                                        🎥 Camera:
+                                    </label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <select value={selectedCameraId || ''} onChange={(e) => handleCameraChange(e.target.value)}
+                                            style={{
+                                                flex: 1, padding: '8px', background: 'rgba(255, 255, 255, 0.1)',
+                                                border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '6px',
+                                                color: 'white', fontSize: '13px'
+                                            }}>
+                                            {availableCameras.map((camera, index) => (
+                                                <option key={camera.deviceId} value={camera.deviceId}>
+                                                    {camera.label || `Camera ${index + 1}`}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button onClick={refreshCameraList}
+                                            style={{
+                                                padding: '8px 12px', background: 'rgba(74, 144, 226, 0.2)',
+                                                border: '1px solid #4a90e2', color: '#4a90e2', borderRadius: '6px',
+                                                cursor: 'pointer', fontSize: '12px'
+                                            }}>
+                                            🔄
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label style={{ color: '#b0bec5', marginBottom: '8px', display: 'block' }}>
+                                        ⚙️ Mode:
+                                    </label>
+                                    <select value={scanMode} onChange={(e) => setScanMode(e.target.value)} disabled={isScanning}
+                                        style={{
+                                            width: '100%', padding: '8px', background: 'rgba(255, 255, 255, 0.1)',
+                                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '6px',
+                                            color: 'white', fontSize: '13px'
+                                        }}>
+                                        <option value="continuous">🔄 Continuous</option>
+                                        <option value="single">📷 Single Shot</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label style={{ 
+                                        display: 'flex', alignItems: 'center', gap: '8px', 
+                                        cursor: 'pointer', color: '#b0bec5'
                                     }}>
                                         <input 
                                             type="checkbox" 
-                                            checked={value}
-                                            onChange={(e) => setter(e.target.checked)}
+                                            checked={autoSaveEnabled}
+                                            onChange={(e) => {
+                                                setAutoSaveEnabled(e.target.checked);
+                                                localStorage.setItem('mtg_auto_save', JSON.stringify(e.target.checked));
+                                            }}
                                             style={{ transform: 'scale(1.2)', accentColor: '#4a90e2' }}
                                         />
-                                        <div>
-                                            <div style={{ fontWeight: '600', color: '#e2e8f0' }}>{title}</div>
-                                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>{desc}</div>
-                                        </div>
+                                        💾 Auto-save to Collection
                                     </label>
-                                ))}
+                                </div>
                             </div>
                         </div>
 
                         {/* Camera & Scanning */}
                         <div style={{
                             background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '15px', padding: '24px'
+                            border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '15px',
+                            padding: '24px'
                         }}>
-                            {/* Mock Video Container */}
+                            {/* Video Container */}
                             <div style={{ position: 'relative', marginBottom: '20px' }}>
-                                <div style={{
-                                    width: '100%', maxWidth: '800px', height: '450px',
-                                    borderRadius: '12px', border: '2px solid #4a90e2', background: '#000',
-                                    boxShadow: '0 8px 32px rgba(74, 144, 226, 0.2)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: '48px', position: 'relative'
-                                }}>
-                                    📷
-                                    <div style={{
-                                        position: 'absolute', bottom: '20px', left: '20px',
-                                        color: 'white', fontSize: '14px', background: 'rgba(0,0,0,0.7)',
-                                        padding: '8px 12px', borderRadius: '6px'
-                                    }}>
-                                        Demo Mode - Simulated Camera Feed
-                                    </div>
-                                </div>
+                                <video ref={videoRef}
+                                    style={{
+                                        width: '100%', maxWidth: '640px', height: 'auto',
+                                        borderRadius: '12px', border: '2px solid #4a90e2', background: '#000'
+                                    }}
+                                    autoPlay playsInline muted />
                                 
-                                <ProfessionalCooldownStatus
+                                {/* Cooldown Status Overlay */}
+                                <CooldownStatus
                                     cooldownStatus={cooldownStatus}
-                                    isVisible={true}
+                                    isVisible={isScanning}
                                 />
                                 
+                                {/* Camera Error Overlay */}
+                                {cameraError && (
+                                    <div style={{
+                                        position: 'absolute', top: '50%', left: '50%',
+                                        transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.9)',
+                                        color: 'white', padding: '20px', borderRadius: '12px',
+                                        textAlign: 'center', border: '2px solid #dc3545'
+                                    }}>
+                                        <h3>📹 Camera Issue</h3>
+                                        <p><strong>{cameraError.message}</strong></p>
+                                        <p>{cameraError.action}</p>
+                                        {cameraError.canRetry && (
+                                            <button onClick={() => setupCamera()}
+                                                style={{
+                                                    padding: '10px 20px', background: '#4a90e2',
+                                                    border: 'none', color: 'white', borderRadius: '6px',
+                                                    cursor: 'pointer', marginTop: '10px'
+                                                }}>
+                                                🔄 Try Again
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                                
+                                {/* Scanning Overlay */}
                                 {isScanning && (
                                     <div style={{
                                         position: 'absolute', top: '10px', left: '10px',
-                                        background: 'rgba(74, 144, 226, 0.9)', color: 'white',
+                                        background: 'rgba(74, 144, 226, 0.8)', color: 'white',
                                         padding: '8px 12px', borderRadius: '6px',
-                                        fontSize: '14px', fontWeight: '600',
-                                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                                        fontSize: '14px', fontWeight: '600'
                                     }}>
-                                        {scanningPausedForSelection ? 
-                                            '⏸️ Paused for edition selection' :
-                                            '🔍 Scanning for MTG cards...'
-                                        }
+                                        🔍 Scanning for MTG cards...
                                     </div>
                                 )}
+                                
+                                {/* Camera Status */}
+                                <div style={{
+                                    position: 'absolute', bottom: '10px', left: '10px',
+                                    background: 'rgba(0,0,0,0.8)', color: 'white',
+                                    padding: '6px 10px', borderRadius: '4px',
+                                    fontSize: '12px', fontWeight: '500'
+                                }}>
+                                    📷 {cameraStatus === 'ready' ? 'Ready' : 
+                                         cameraStatus === 'requesting' ? 'Initializing...' : 
+                                         cameraStatus === 'error' ? 'Error' : 'Starting...'}
+                                </div>
                             </div>
 
-                            {/* Camera Selector */}
-                            <CameraSelector
-                                availableCameras={availableCameras}
-                                selectedCameraId={selectedCameraId}
-                                onCameraChange={handleCameraSwitch}
-                                onRefresh={refreshCameraList}
-                                onDiagnose={diagnoseCameraIssues}
-                                cameraStatus={cameraStatus}
-                            />
+                            {/* Scan Control */}
+                            <button onClick={isScanning ? stopScanning : startScanning}
+                                disabled={cameraStatus !== 'ready'}
+                                style={{
+                                    width: '100%', padding: '16px 24px', border: 'none',
+                                    background: isScanning 
+                                        ? 'linear-gradient(135deg, #dc3545, #c82333)' 
+                                        : 'linear-gradient(135deg, #4a90e2, #64b5f6)',
+                                    color: 'white', borderRadius: '8px',
+                                    cursor: cameraStatus !== 'ready' ? 'not-allowed' : 'pointer',
+                                    fontSize: '16px', fontWeight: '600',
+                                    opacity: cameraStatus !== 'ready' ? 0.6 : 1,
+                                    transition: 'all 0.2s ease'
+                                }}>
+                                {isScanning ? '⏹️ Stop Scanning' : `🔥 Start ${scanMode} Scan`}
+                            </button>
+                        </div>
 
-                            {/* Scan Controls */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div>
-                                    <label style={{ color: '#b0bec5', marginBottom: '8px', display: 'block', fontWeight: '500' }}>
-                                        ⚙️ Scan Mode:
-                                    </label>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        {['continuous', 'single'].map(mode => (
-                                            <button key={mode}
-                                                onClick={() => setScanMode(mode)}
-                                                disabled={isScanning}
-                                                style={{
-                                                    flex: 1, padding: '12px',
-                                                    border: scanMode === mode ? '2px solid #4a90e2' : '1px solid #666',
-                                                    background: scanMode === mode ? 
-                                                        'linear-gradient(45deg, #4a90e2, #64b5f6)' : 
-                                                        'rgba(74, 144, 226, 0.1)',
-                                                    color: 'white', borderRadius: '8px',
-                                                    cursor: isScanning ? 'not-allowed' : 'pointer',
-                                                    fontSize: '13px', fontWeight: '600',
-                                                    opacity: isScanning ? 0.6 : 1, transition: 'all 0.2s ease'
-                                                }}>
-                                                {mode === 'continuous' ? '🔥 Smart Continuous' : '📷 Smart Single'}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <button onClick={isScanning ? stopScanning : startScanning}
-                                    disabled={cameraStatus !== 'ready'}
-                                    style={{
-                                        padding: '16px 24px', border: 'none',
-                                        background: isScanning 
-                                            ? 'linear-gradient(135deg, #dc3545, #c82333)' 
-                                            : cameraStatus === 'ready' 
-                                                ? 'linear-gradient(135deg, #4a90e2, #64b5f6)'
-                                                : 'linear-gradient(135deg, #666, #555)',
-                                        color: 'white', borderRadius: '8px',
-                                        cursor: cameraStatus !== 'ready' ? 'not-allowed' : 'pointer',
-                                        fontSize: '16px', fontWeight: '600',
-                                        opacity: cameraStatus !== 'ready' ? 0.6 : 1,
-                                        transition: 'all 0.2s ease',
-                                        boxShadow: cameraStatus === 'ready' ? '0 4px 15px rgba(74, 144, 226, 0.3)' : 'none'
-                                    }}>
-                                    {isScanning ? 
-                                        '⏹️ Stop Scanning' : 
-                                        cameraStatus === 'ready' ?
-                                            `🔥 Start ${scanMode === 'continuous' ? 'Continuous' : 'Single'} Scan` :
-                                            '📷 Camera Not Ready'
-                                    }
-                                </button>
-
-                                {cooldownStatus && !cooldownStatus.canScan && (
+                        {/* Current Card Display */}
+                        {(currentCard || scanResult) && (
+                            <div style={{
+                                background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '15px',
+                                padding: '24px'
+                            }}>
+                                <h3 style={{ color: '#4a90e2', marginBottom: '20px' }}>🎯 Current Detection</h3>
+                                
+                                {currentCard ? (
                                     <div style={{
-                                        background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)',
-                                        borderRadius: '8px', padding: '12px', textAlign: 'center', fontSize: '13px'
+                                        background: 'rgba(34, 197, 94, 0.1)',
+                                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                                        borderRadius: '12px', padding: '20px'
                                     }}>
-                                        <div style={{ color: '#fbbf24', fontWeight: '600' }}>⏳ Smart Cooldown Active</div>
-                                        <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '4px' }}>
-                                            Preventing API spam for stable detection
+                                        <div style={{ 
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+                                            marginBottom: '16px', flexWrap: 'wrap', gap: '12px'
+                                        }}>
+                                            <div style={{ flex: 1, minWidth: '200px' }}>
+                                                <div style={{ 
+                                                    fontSize: '20px', fontWeight: 'bold', color: '#22c55e',
+                                                    marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px'
+                                                }}>
+                                                    {currentCard.cardName}
+                                                    {currentCard.isVerified && <span style={{fontSize: '14px'}}>✅</span>}
+                                                </div>
+                                                
+                                                <div style={{ fontSize: '14px', color: '#94a3b8', lineHeight: '1.6' }}>
+                                                    {currentCard.cardType && <div><strong>Type:</strong> {currentCard.cardType}</div>}
+                                                    {currentCard.manaCost && <div><strong>Mana Cost:</strong> {currentCard.manaCost}</div>}
+                                                    {currentCard.setInfo && <div><strong>Set:</strong> {currentCard.setInfo}</div>}
+                                                    {currentCard.rarity && <div><strong>Rarity:</strong> {currentCard.rarity}</div>}
+                                                    {currentCard.prices?.usd && <div><strong>Price:</strong> ${currentCard.prices.usd}</div>}
+                                                    <div><strong>Confidence:</strong> {currentCard.confidence}%</div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '120px' }}>
+                                                <button onClick={() => saveCardToCollection(currentCard)}
+                                                    style={{
+                                                        padding: '10px 16px', background: 'rgba(74, 144, 226, 0.2)',
+                                                        border: '1px solid #4a90e2', color: '#4a90e2',
+                                                        borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600'
+                                                    }}>
+                                                    💾 Save to Collection
+                                                </button>
+                                                
+                                                {currentCard.scryfallUri && (
+                                                    <button onClick={() => openCardInScryfall(currentCard)}
+                                                        style={{
+                                                            padding: '10px 16px', background: 'rgba(34, 197, 94, 0.2)',
+                                                            border: '1px solid #22c55e', color: '#22c55e',
+                                                            borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600'
+                                                        }}>
+                                                        🔗 View on Scryfall
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Confidence Bar */}
+                                        <div style={{
+                                            width: '100%', height: '8px',
+                                            background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px',
+                                            overflow: 'hidden'
+                                        }}>
+                                            <div style={{
+                                                height: '100%', background: 'linear-gradient(90deg, #22c55e, #34d399)',
+                                                width: `${currentCard.confidence}%`, borderRadius: '4px',
+                                                transition: 'width 0.3s ease'
+                                            }}></div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                                        <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+                                            {scanResult?.message || 'No card detected'}
                                         </div>
                                     </div>
                                 )}
                             </div>
-                        </div>
-
-                        {/* Card Display */}
-                        <div style={{
-                            background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '15px', padding: '24px'
-                        }}>
-                            <h3 style={{ color: '#4a90e2', marginBottom: '20px', fontSize: '1.5rem', fontWeight: '600' }}>
-                                🎯 Card Recognition
-                            </h3>
-                            
-                            {currentCard ? (
-                                <div style={{
-                                    background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)',
-                                    borderRadius: '12px', padding: '20px', marginBottom: '16px'
-                                }}>
-                                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#22c55e', marginBottom: '12px' }}>
-                                        {currentCard.cardName}
-                                    </div>
-                                    
-                                    <div style={{ textAlign: 'left', fontSize: '14px', marginBottom: '12px' }}>
-                                        {[
-                                            ['Type', currentCard.cardType || 'Unknown'],
-                                            ['Confidence', `${currentCard.confidence}%`],
-                                            ['Method', currentCard.scryfallVerified ? '✅ Scryfall Verified' : '🧠 AI Detection'],
-                                            ['Price', currentCard.prices?.usd ? `$${currentCard.prices.usd}` : null]
-                                        ].filter(([_, value]) => value).map(([label, value]) => (
-                                            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                                <span style={{ color: '#94a3b8' }}>{label}:</span>
-                                                <span style={{ 
-                                                    color: label === 'Price' ? '#22c55e' : 'white', 
-                                                    fontWeight: '600' 
-                                                }}>{value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    
-                                    <div style={{
-                                        width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.1)',
-                                        borderRadius: '4px', overflow: 'hidden', marginBottom: '16px'
-                                    }}>
-                                        <div style={{
-                                            height: '100%', background: 'linear-gradient(90deg, #22c55e, #34d399)',
-                                            width: `${currentCard.confidence}%`, borderRadius: '4px',
-                                            transition: 'width 0.3s ease'
-                                        }}></div>
-                                    </div>
-
-                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                        <button onClick={() => saveCardToCollection(currentCard)}
-                                            style={{
-                                                padding: '8px 16px', background: 'rgba(74, 144, 226, 0.2)',
-                                                border: '1px solid #4a90e2', color: '#4a90e2', borderRadius: '6px',
-                                                cursor: 'pointer', fontSize: '13px', fontWeight: '500'
-                                            }}>
-                                            💾 Save to Collection ({savedCards.length}/{FREE_COLLECTION_LIMIT})
-                                        </button>
-                                        {currentCard.scryfallUri && (
-                                            <button onClick={() => window.open(currentCard.scryfallUri, '_blank')}
-                                                style={{
-                                                    padding: '8px 16px', background: 'rgba(34, 197, 94, 0.2)',
-                                                    border: '1px solid #22c55e', color: '#22c55e', borderRadius: '6px',
-                                                    cursor: 'pointer', fontSize: '13px', fontWeight: '500'
-                                                }}>
-                                                🔗 View on Scryfall
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>🃏</div>
-                                    <h4 style={{ color: '#e2e8f0', marginBottom: '8px' }}>Ready to Scan</h4>
-                                    <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                                        {scanResult && !scanResult.hasCard ? 
-                                            (scanResult.message || 'No MTG card detected') :
-                                            'Position an MTG card in the camera view and start scanning'
-                                        }
-                                    </div>
-                                </div>
-                            )}
-
-                            {scanHistory.length > 0 && (
-                                <div style={{marginTop: '24px'}}>
-                                    <h4 style={{color: '#4a90e2', marginBottom: '16px', fontSize: '16px', fontWeight: '600'}}>
-                                        📊 Recent Scans ({scanHistory.length})
-                                    </h4>
-                                    <div style={{maxHeight: '200px', overflowY: 'auto'}}>
-                                        {scanHistory.slice(0, 10).map((card, index) => (
-                                            <div key={index} style={{
-                                                padding: '12px', margin: '8px 0',
-                                                background: 'rgba(74, 144, 226, 0.1)', borderRadius: '8px',
-                                                fontSize: '13px', display: 'flex',
-                                                justifyContent: 'space-between', alignItems: 'center',
-                                                border: '1px solid rgba(74, 144, 226, 0.2)'
-                                            }}>
-                                                <span style={{fontWeight: '600'}}>{card.cardName}</span>
-                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                    <span style={{color: '#64b5f6', fontWeight: '700'}}>{card.confidence}%</span>
-                                                    {card.scryfallVerified && <span style={{color: '#22c55e'}}>✅</span>}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        )}
                     </>
                 )}
 
@@ -1718,38 +1427,28 @@ const Scanner = () => {
                     <div style={{
                         background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)',
                         border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '15px',
-                        padding: '32px', width: '100%'
+                        padding: '32px'
                     }}>
                         <CollectionManager 
                             savedCards={savedCards}
                             onRemoveCard={removeCardFromCollection}
                             onOpenScryfall={openCardInScryfall}
+                            onExportToMoxfield={exportToMoxfield}
                         />
                     </div>
                 )}
 
-                {/* Knowledge Tab */}
-                {activeTab === 'knowledge' && (
+                {/* History Tab */}
+                {activeTab === 'history' && (
                     <div style={{
                         background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)',
                         border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '15px',
-                        padding: '32px', width: '100%'
+                        padding: '32px'
                     }}>
-                        <MTGKnowledgeBase 
-                            currentCard={currentCard}
-                            savedCards={savedCards}
+                        <ScanHistoryViewer 
+                            scanHistory={scanHistory}
+                            onSaveCard={saveCardToCollection}
                         />
-                    </div>
-                )}
-
-                {/* Premium Tab */}
-                {activeTab === 'premium' && (
-                    <div style={{
-                        background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '15px',
-                        padding: '32px', width: '100%'
-                    }}>
-                        <PremiumUpgradeSystem onClose={() => {}} />
                     </div>
                 )}
             </div>
@@ -1763,131 +1462,21 @@ const Scanner = () => {
                 flexWrap: 'wrap', gap: '16px'
             }}>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 'bold', color: '#4a90e2', fontSize: '16px' }}>
-                        MTG Scanner Pro - Complete
-                    </div>
-                    {scanHistory.length > 0 && (
-                        <>
-                            <span style={{ fontSize: '14px' }}>📊 Scanned: {scanHistory.length}</span>
-                            {currentCard && (
-                                <span style={{ fontSize: '14px' }}>
-                                    🎯 Last: {currentCard.cardName} ({currentCard.confidence}%)
-                                </span>
-                            )}
-                        </>
+                    <div style={{ fontWeight: 'bold', color: '#4a90e2' }}>MTG Scanner Pro</div>
+                    {currentCard && (
+                        <span style={{ fontSize: '14px' }}>
+                            🎯 Last: {currentCard.cardName} ({currentCard.confidence}%)
+                        </span>
                     )}
                 </div>
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', fontSize: '14px' }}>
-                    <span>📷 Cameras: {availableCameras.length}</span>
-                    <span>📁 Collection: {savedCards.length}/{FREE_COLLECTION_LIMIT}</span>
-                    <span>📷 Status: Ready ✅</span>
-                    <span>🧠 AI: Mock Demo</span>
-                    <span>{isPremiumUser ? '💎 Premium' : '🆓 Free'}</span>
+                    <span>📷 {cameraStatus === 'ready' ? 'Ready ✅' : 'Setup ⏳'}</span>
+                    <span>🧠 Gemini AI</span>
+                    <span>📊 Scryfall DB</span>
+                    <span>🔥 {cooldownStatus.canScan ? 'Ready' : 'Cooldown'}</span>
+                    {autoSaveEnabled && <span>💾 Auto-save ON</span>}
                 </div>
             </div>
-
-            {/* Edition Selector Modal */}
-            {showEditionSelector && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                    background: 'rgba(0,0,0,0.9)', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center', zIndex: 10000
-                }}>
-                    <div style={{
-                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f1419 100%)',
-                        border: '2px solid #4a90e2', borderRadius: '16px', padding: '32px',
-                        maxWidth: '500px', width: '90%', textAlign: 'center', color: 'white'
-                    }}>
-                        <h3 style={{ color: '#4a90e2', marginBottom: '20px' }}>🎭 Multiple Editions Found</h3>
-                        <p style={{ marginBottom: '20px', color: '#94a3b8' }}>
-                            Choose the correct edition for <strong style={{ color: '#4a90e2' }}>{pendingCardData?.cardName}</strong>:
-                        </p>
-                        
-                        <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '20px' }}>
-                            {availableEditions.map((edition, index) => (
-                                <div key={index} onClick={() => handleEditionSelected(edition)}
-                                    style={{
-                                        padding: '12px', margin: '8px 0',
-                                        background: 'rgba(74, 144, 226, 0.1)',
-                                        border: '1px solid rgba(74, 144, 226, 0.3)',
-                                        borderRadius: '8px', cursor: 'pointer', textAlign: 'left'
-                                    }}>
-                                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                                        {edition.set_name || edition.name}
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                                        Set: {(edition.set || 'Unknown').toUpperCase()} • {edition.released_at || 'Unknown date'}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        
-                        <button onClick={handleEditionCancelled}
-                            style={{
-                                padding: '12px 24px', background: 'transparent',
-                                border: '1px solid #666', color: '#94a3b8',
-                                borderRadius: '8px', cursor: 'pointer'
-                            }}>
-                            Skip Edition Selection
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Premium Modal */}
-            {showPremiumModal && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                    background: 'rgba(0,0,0,0.9)', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center', zIndex: 10000
-                }}>
-                    <div style={{
-                        background: '#23272a', border: '2px solid #4a90e2', borderRadius: '16px',
-                        padding: '32px', maxWidth: '500px', width: '90%', textAlign: 'center', color: 'white'
-                    }}>
-                        <h3>💎 Upgrade to Premium</h3>
-                        
-                        <div style={{ margin: '20px 0', fontSize: '18px' }}>
-                            <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
-                                You've reached the <strong>{FREE_COLLECTION_LIMIT} card limit</strong> for free users!
-                            </p>
-                        </div>
-                        
-                        <div style={{
-                            background: 'rgba(74, 144, 226, 0.1)', padding: '20px',
-                            borderRadius: '10px', margin: '20px 0'
-                        }}>
-                            <h4 style={{ margin: '0 0 15px 0', color: '#4a90e2' }}>Premium Features:</h4>
-                            <ul style={{ textAlign: 'left', lineHeight: '1.8', margin: 0, paddingLeft: '20px' }}>
-                                <li>🔥 <strong>Unlimited collection storage</strong></li>
-                                <li>🧠 <strong>Advanced AI learning</strong></li>
-                                <li>📊 <strong>Collection analytics</strong></li>
-                                <li>💰 <strong>Price tracking & alerts</strong></li>
-                                <li>🎯 <strong>Deck optimization tools</strong></li>
-                                <li>⚡ <strong>Priority customer support</strong></li>
-                            </ul>
-                        </div>
-                        
-                        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-                            <button onClick={handlePremiumUpgrade}
-                                style={{
-                                    padding: '12px 24px', border: 'none', borderRadius: '8px',
-                                    background: 'linear-gradient(45deg, #4a90e2, #357abd)',
-                                    color: 'white', fontWeight: 'bold', cursor: 'pointer'
-                                }}>
-                                💎 Upgrade for €39/year
-                            </button>
-                            <button onClick={() => setShowPremiumModal(false)}
-                                style={{
-                                    padding: '12px 24px', border: '1px solid #666', borderRadius: '8px',
-                                    background: 'transparent', color: 'white', cursor: 'pointer'
-                                }}>
-                                Maybe Later
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

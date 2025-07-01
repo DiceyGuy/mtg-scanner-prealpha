@@ -7,7 +7,15 @@ class GeminiVisionService {
         this.debugMode = true;
         
         // 🔥 IMPROVED GOOGLE GEMINI API CONFIGURATION
-        this.geminiApiKey = 'AIzaSyBtqyUy1X3BdNtUAW88QZWbtqI39MbUDdk';
+        // 🔒 SIKKER: Bruk environment variable
+this.geminiApiKey = process.env.REACT_APP_GEMINI_API_KEY;
+
+if (!this.geminiApiKey) {
+    console.error('❌ Gemini API key not found in environment variables');
+    throw new Error('Gemini API key required for MTG Scanner to function');
+}
+
+console.log('✅ Gemini API key loaded from environment variables');
         this.geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         this.lastGeminiCall = 0;
         this.geminiRateLimit = 4000; // 🔥 INCREASED from 1000ms to 4000ms (4 seconds)

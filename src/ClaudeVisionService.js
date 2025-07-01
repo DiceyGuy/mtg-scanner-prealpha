@@ -1,20 +1,22 @@
-// ClaudeVisionService.js - BROWSER-COMPATIBLE VERSION
-class ClaudeVisionService {
+// ClaudeVisionService.js - FIXED RATE LIMITING LOGIC
+class GeminiVisionService {
     constructor() {
         console.log('🧠 MTG CARD SCANNER - GEMINI + SCRYFALL INTEGRATION!');
         this.canvas = null;
         this.ctx = null;
         this.debugMode = true;
         
-        // 🔥 GOOGLE GEMINI API CONFIGURATION
+        // 🔥 FIXED: Better rate limiting configuration
         this.geminiApiKey = 'AIzaSyBtqyUy1X3BdNtUAW88QZWbtqI39MbUDdk';
         this.geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         this.lastGeminiCall = 0;
-        this.geminiRateLimit = 4000; // 4 seconds between calls
+        this.geminiRateLimit = 5000; // 🔥 INCREASED: 5 seconds base rate limit
         this.consecutiveErrors = 0;
-        this.backoffMultiplier = 1.5;
+        this.consecutiveRateLimits = 0; // 🔥 NEW: Separate counter for rate limits
+        this.backoffMultiplier = 1.3; // 🔥 REDUCED: Less aggressive backoff
+        this.maxBackoff = 15000; // 🔥 NEW: Maximum 15 seconds backoff
         
-        // Frame similarity detection to avoid duplicate API calls
+        // 🔥 NEW: Frame similarity detection to reduce API calls
         this.lastFrameHash = null;
         this.frameSimilarityThreshold = 0.95;
         this.lastSuccessfulDetection = null;
@@ -29,9 +31,7 @@ class ClaudeVisionService {
         console.log('🔧 MTG-focused scanner with Scryfall database integration');
         console.log('📦 Loading Scryfall MTG database...');
         
-        // Start loading Scryfall data
         this.initializeScryfallData();
-        
         this.log('🚀 MTG Scanner initialized - preparing Scryfall database');
     }
 
@@ -42,11 +42,8 @@ class ClaudeVisionService {
         console.log('📦 Loading Scryfall MTG card database...');
         
         try {
-            // Get bulk data info from Scryfall
             const bulkResponse = await fetch('https://api.scryfall.com/bulk-data');
             const bulkInfo = await bulkResponse.json();
-            
-            // Find the Oracle Cards bulk data (best for card identification)
             const oracleCards = bulkInfo.data.find(item => item.type === 'oracle_cards');
             
             if (!oracleCards) {
@@ -59,14 +56,12 @@ class ClaudeVisionService {
                 updated: oracleCards.updated_at
             });
             
-            // Download the actual card data
             const cardsResponse = await fetch(oracleCards.download_uri);
             const cardsData = await cardsResponse.json();
             
-            // Process and index the cards for fast lookup
             let processedCards = 0;
             for (const card of cardsData) {
-                if (card.lang === 'en') { // Only English cards
+                if (card.lang === 'en') {
                     const cardKey = card.name.toLowerCase();
                     this.scryfallData.set(cardKey, {
                         name: card.name,
@@ -105,10 +100,9 @@ class ClaudeVisionService {
         }
     }
 
-    // Calculate simple frame hash for similarity detection
     calculateFrameHash(imageData) {
         let hash = 0;
-        const step = Math.floor(imageData.length / 100); // Sample 100 points
+        const step = Math.floor(imageData.length / 100);
         
         for (let i = 0; i < imageData.length; i += step) {
             hash = ((hash << 5) - hash + imageData[i]) & 0xffffffff;
@@ -117,7 +111,6 @@ class ClaudeVisionService {
         return hash;
     }
 
-    // Check if current frame is too similar to last frame
     isFrameSimilarToLast(frameData) {
         const canvas = frameData.canvas;
         const ctx = canvas.getContext('2d');
@@ -129,9 +122,8 @@ class ClaudeVisionService {
             return false;
         }
         
-        // Simple similarity check - if hash is identical or very close, skip
         const hashDifference = Math.abs(currentHash - this.lastFrameHash);
-        const isSimilar = hashDifference < 1000; // Threshold for "too similar"
+        const isSimilar = hashDifference < 1000;
         
         this.lastFrameHash = currentHash;
         
@@ -142,26 +134,21 @@ class ClaudeVisionService {
         return isSimilar;
     }
 
-    // MAIN PROCESSING METHOD - MTG FOCUSED
     async processVideoFrame(videoElement) {
         this.log('🔄 Processing frame for MTG CARD IDENTIFICATION...');
         const startTime = performance.now();
         
         try {
-            // Step 1: Capture frame
             const frameData = await this.captureHighQualityFrame(videoElement);
             this.log('📷 Frame captured', `${frameData.width}x${frameData.height}`);
             
-            // Check frame similarity to avoid duplicate API calls
             if (this.isFrameSimilarToLast(frameData)) {
-                // Return last successful detection if we have one and it's recent
                 if (this.lastSuccessfulDetection && 
                     Date.now() - this.lastSuccessfulTime < 5000) {
                     this.log('♻️ Returning cached detection for similar frame');
                     return this.lastSuccessfulDetection;
                 }
                 
-                // Otherwise return no detection
                 return {
                     hasCard: false,
                     message: 'Frame unchanged, skipping scan',
@@ -172,62 +159,78 @@ class ClaudeVisionService {
                 };
             }
             
-            // Step 2: MTG-focused Gemini Vision analysis
             const geminiResult = await this.callGeminiVisionForMTG(frameData);
             this.log('🎯 Gemini MTG analysis result', geminiResult);
             
-            // Step 3: Enhance with Scryfall database
             const enhancedResult = await this.enhanceWithScryfallData(geminiResult, frameData);
             this.log('✨ Scryfall-enhanced result', enhancedResult);
             
             const processingTime = Math.round(performance.now() - startTime);
             const finalResult = this.formatMTGScannerResult(enhancedResult, processingTime);
             
-            // Cache successful detections
             if (finalResult.hasCard && finalResult.confidence >= 80) {
                 this.lastSuccessfulDetection = finalResult;
                 this.lastSuccessfulTime = Date.now();
-                this.consecutiveErrors = 0; // Reset error count on success
+                // 🔥 FIXED: Only reset on actual success, not on rate limiting
+                this.consecutiveErrors = 0;
+                this.consecutiveRateLimits = 0;
             }
             
             return finalResult;
             
         } catch (error) {
             this.log('❌ MTG scanning error, using fallback', error.message);
-            this.consecutiveErrors++;
+            
+            // 🔥 FIXED: Don't increment errors for rate limiting
+            if (!error.message.includes('Rate limited')) {
+                this.consecutiveErrors++;
+            }
+            
             const processingTime = Math.round(performance.now() - startTime);
             return await this.mtgFallback(videoElement, processingTime);
         }
     }
 
-    // MTG-OPTIMIZED GEMINI VISION CALL with better rate limiting
+    // 🔥 FIXED: Much better rate limiting logic
     async callGeminiVisionForMTG(frameData) {
         this.log('🧠 Calling Gemini Vision for MTG CARD IDENTIFICATION...');
         
-        // Dynamic rate limiting with backoff
         const now = Date.now();
         let actualRateLimit = this.geminiRateLimit;
         
-        // Apply exponential backoff if we've had consecutive errors
+        // 🔥 FIXED: Separate handling for consecutive rate limits vs errors
+        if (this.consecutiveRateLimits > 0) {
+            // Apply gentle backoff only for rate limits
+            actualRateLimit = Math.min(
+                this.geminiRateLimit + (this.consecutiveRateLimits * 2000), // +2s per rate limit
+                this.maxBackoff // Cap at 15 seconds
+            );
+            console.log(`⏳ Rate limit backoff: ${actualRateLimit}ms (rate limits: ${this.consecutiveRateLimits})`);
+        }
+        
+        // 🔥 FIXED: Apply backoff only for actual errors, not rate limits
         if (this.consecutiveErrors > 0) {
-            actualRateLimit = this.geminiRateLimit * Math.pow(this.backoffMultiplier, this.consecutiveErrors);
-            actualRateLimit = Math.min(actualRateLimit, 30000); // Max 30 seconds
-            console.log(`⏳ Applying backoff: ${actualRateLimit}ms (errors: ${this.consecutiveErrors})`);
+            const errorBackoff = this.geminiRateLimit * Math.pow(this.backoffMultiplier, this.consecutiveErrors);
+            actualRateLimit = Math.max(actualRateLimit, Math.min(errorBackoff, this.maxBackoff));
+            console.log(`⚠️ Error backoff: ${actualRateLimit}ms (errors: ${this.consecutiveErrors})`);
         }
         
         if (now - this.lastGeminiCall < actualRateLimit) {
             const waitTime = actualRateLimit - (now - this.lastGeminiCall);
             this.log(`⏳ Rate limiting: waiting ${waitTime}ms`);
+            
+            // 🔥 FIXED: Track rate limits separately
+            this.consecutiveRateLimits++;
+            
             throw new Error(`Rate limited - wait ${waitTime}ms between calls`);
         }
+        
         this.lastGeminiCall = now;
         
-        // Convert frame to base64
         const imageBase64 = this.frameToBase64(frameData);
         const base64Data = imageBase64.split(',')[1];
         this.log('📤 Image ready for MTG analysis, size:', base64Data.length);
         
-        // More specific MTG prompt
         const mtgPrompt = `You are an expert Magic: The Gathering card identifier. Analyze this image ONLY for MTG cards.
 
 CRITICAL RULES:
@@ -265,10 +268,10 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                 ]
             }],
             generationConfig: {
-                temperature: 0.1, // Lower temperature for more consistent results
+                temperature: 0.1,
                 topK: 1,
                 topP: 0.8,
-                maxOutputTokens: 200 // Limit output length
+                maxOutputTokens: 200
             }
         };
 
@@ -291,32 +294,37 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                 const errorText = await response.text();
                 this.log('❌ Gemini error response:', errorText);
                 
-                // Check for specific rate limit errors
                 if (response.status === 429) {
-                    this.consecutiveErrors++;
-                    throw new Error(`Gemini rate limited: ${response.status} - Implementing longer backoff`);
+                    // 🔥 FIXED: 429 is rate limiting, not an error
+                    this.consecutiveRateLimits++;
+                    throw new Error(`Rate limited: ${response.status} - Gemini API rate limit exceeded`);
                 }
                 
+                // 🔥 FIXED: Other errors are actual errors
+                this.consecutiveErrors++;
                 throw new Error(`Gemini error: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
             
-            // Check if response has expected structure
             if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
                 throw new Error('Invalid Gemini response structure');
             }
             
-            // LOG THE RAW RESPONSE TO DEBUG JSON PARSING
             const responseText = data.candidates[0].content.parts[0].text;
             console.log('🎯 RAW GEMINI RESPONSE (for debugging):');
             console.log('---START RESPONSE---');
             console.log(responseText);
             console.log('---END RESPONSE---');
             
-            // Parse MTG-specific response format
             const mtgAnalysis = this.parseMTGResponse(responseText);
             this.log('✅ MTG parsing successful:', mtgAnalysis);
+            
+            // 🔥 FIXED: Reset rate limit counter on success
+            if (mtgAnalysis.hasCard) {
+                this.consecutiveRateLimits = 0;
+                this.consecutiveErrors = 0;
+            }
             
             return mtgAnalysis;
 
@@ -326,7 +334,6 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         }
     }
 
-    // Parse MTG-specific response with better error handling
     parseMTGResponse(responseText) {
         if (!responseText || responseText.includes('NOT_MTG_CARD')) {
             return {
@@ -366,7 +373,6 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
             }
         }
         
-        // Validation: Must have card name and reasonable confidence
         if (!result.cardName || result.cardName.length < 3) {
             return {
                 hasCard: false,
@@ -376,7 +382,6 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
             };
         }
         
-        // Must have high confidence for MTG cards
         if (result.confidence < 80) {
             return {
                 hasCard: false,
@@ -389,7 +394,6 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         return result;
     }
 
-    // ENHANCE WITH SCRYFALL DATABASE
     async enhanceWithScryfallData(geminiResult, frameData) {
         this.log('✨ Enhancing with Scryfall MTG database...');
         
@@ -403,12 +407,11 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         if (geminiResult.hasCard && geminiResult.cardName) {
             const cardKey = geminiResult.cardName.toLowerCase().trim();
             
-            // Direct Scryfall lookup
             if (this.scryfallData.has(cardKey)) {
                 const scryfallCard = this.scryfallData.get(cardKey);
                 enhanced = {
                     ...enhanced,
-                    cardName: scryfallCard.name, // Use official name
+                    cardName: scryfallCard.name,
                     setInfo: scryfallCard.set,
                     cardType: scryfallCard.type_line,
                     manaCost: scryfallCard.mana_cost,
@@ -416,13 +419,12 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                     colors: scryfallCard.colors,
                     imageUri: scryfallCard.image_uri,
                     scryfallUri: scryfallCard.scryfall_uri,
-                    confidence: Math.min(enhanced.confidence + 10, 98), // Smaller boost
+                    confidence: Math.min(enhanced.confidence + 10, 98),
                     verificationSource: 'scryfall_exact_match',
                     isVerified: true
                 };
                 this.log('✅ EXACT MATCH found in Scryfall database:', scryfallCard.name);
             } else {
-                // Fuzzy matching in Scryfall database
                 const fuzzyMatch = this.scryfallFuzzyMatch(cardKey);
                 if (fuzzyMatch.found) {
                     enhanced = {
@@ -431,7 +433,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                         setInfo: fuzzyMatch.card.set,
                         cardType: fuzzyMatch.card.type_line,
                         manaCost: fuzzyMatch.card.mana_cost,
-                        confidence: Math.min(enhanced.confidence + 5, 95), // Smaller boost for fuzzy
+                        confidence: Math.min(enhanced.confidence + 5, 95),
                         verificationSource: 'scryfall_fuzzy_match',
                         isFuzzyMatch: true,
                         matchScore: fuzzyMatch.score,
@@ -445,13 +447,11 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         return enhanced;
     }
 
-    // SCRYFALL FUZZY MATCHING
     scryfallFuzzyMatch(cardName) {
         let bestMatch = null;
         let bestScore = 0;
-        const minScore = 0.8; // Higher threshold for fuzzy matching
+        const minScore = 0.8;
         
-        // Search through Scryfall database
         for (const [key, card] of this.scryfallData) {
             const score = this.calculateSimilarity(cardName, key);
             if (score > bestScore && score >= minScore) {
@@ -465,7 +465,6 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
             { found: false, card: null, score: 0 };
     }
 
-    // STRING SIMILARITY CALCULATION
     calculateSimilarity(str1, str2) {
         const longer = str1.length > str2.length ? str1 : str2;
         const shorter = str1.length > str2.length ? str2 : str1;
@@ -509,10 +508,11 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         return matrix[n][m];
     }
 
-    // CAPTURE HIGH-QUALITY FRAME
     async captureHighQualityFrame(videoElement) {
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { 
+            willReadFrequently: true // 🔥 FIXED: Eliminates Canvas2D warnings
+        });
         
         canvas.width = videoElement.videoWidth;
         canvas.height = videoElement.videoHeight;
@@ -530,10 +530,9 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
     }
 
     frameToBase64(frameData) {
-        return frameData.canvas.toDataURL('image/jpeg', 0.8); // Slightly lower quality for faster upload
+        return frameData.canvas.toDataURL('image/jpeg', 0.8);
     }
 
-    // FORMAT MTG SCANNER RESULT with stricter requirements
     formatMTGScannerResult(result, processingTime) {
         if (result.hasCard && result.confidence >= 80 && result.cardName && result.cardName.length >= 3) {
             return {
@@ -574,7 +573,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         }
     }
 
-    // MTG FALLBACK with better error messages
+    // 🔥 FIXED: Better fallback with error context
     async mtgFallback(videoElement, processingTime) {
         this.log('⚠️ MTG Vision unavailable, using fallback...');
         
@@ -582,6 +581,8 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         
         if (this.consecutiveErrors > 3) {
             fallbackMessage = 'Too many errors - please check internet connection and try again later';
+        } else if (this.consecutiveRateLimits > 5) {
+            fallbackMessage = 'Rate limited - waiting for API availability (this is normal)';
         } else if (this.consecutiveErrors > 1) {
             fallbackMessage = 'MTG Scanner experiencing issues - retrying with longer intervals';
         }
@@ -589,17 +590,17 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         return {
             hasCard: false,
             message: fallbackMessage,
-            reason: 'SCANNER_ERROR',
+            reason: this.consecutiveRateLimits > this.consecutiveErrors ? 'RATE_LIMITED' : 'SCANNER_ERROR',
             confidence: 0,
             method: 'improved_mtg_fallback',
             processingTime: processingTime,
             timestamp: new Date().toISOString(),
             scryfallLoaded: this.scryfallLoaded,
-            consecutiveErrors: this.consecutiveErrors
+            consecutiveErrors: this.consecutiveErrors,
+            consecutiveRateLimits: this.consecutiveRateLimits
         };
     }
 
-    // HELPER METHODS
     extractCardNameFromText(text) {
         const lines = text.split('\n');
         for (const line of lines) {
@@ -612,7 +613,6 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         return 'Unknown Card';
     }
 
-    // COMPATIBILITY METHODS
     async scanCard(imageSrc, cardType = 'standard') {
         if (imageSrc && imageSrc.tagName === 'VIDEO') {
             return await this.processVideoFrame(imageSrc);
@@ -627,16 +627,17 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
     setupCanvas(width, height) {
         if (!this.canvas) {
             this.canvas = document.createElement('canvas');
-            this.ctx = this.canvas.getContext('2d');
+            this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
         }
         this.canvas.width = width;
         this.canvas.height = height;
         return { canvas: this.canvas, ctx: this.ctx };
     }
 
-    // Reset method for when user wants to clear errors
+    // 🔥 NEW: Reset all error states
     resetErrorState() {
         this.consecutiveErrors = 0;
+        this.consecutiveRateLimits = 0;
         this.lastFrameHash = null;
         this.lastSuccessfulDetection = null;
         this.lastSuccessfulTime = 0;
@@ -644,4 +645,4 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
     }
 }
 
-export default ClaudeVisionService;
+export default GeminiVisionService;

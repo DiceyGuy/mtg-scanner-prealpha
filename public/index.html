@@ -19,7 +19,7 @@
             overflow-x: hidden;
         }
 
-        /* Loading Screen */
+        /* 🔥 IMPROVED Loading Screen - easier to remove */
         .loading-screen {
             position: fixed;
             top: 0;
@@ -31,14 +31,21 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 10000;
+            z-index: 9999; /* 🔥 Reduced from 10000 to avoid conflicts */
             color: white;
-            transition: opacity 0.5s ease-out;
+            transition: all 0.3s ease-out; /* 🔥 Faster transition */
         }
 
-        .loading-screen.hidden {
+        /* 🔥 Multiple ways to hide loading screen */
+        .loading-screen.hidden,
+        .loading-screen.fade-out {
             opacity: 0;
             pointer-events: none;
+            transform: scale(0.95); /* 🔥 Visual feedback */
+        }
+
+        .loading-screen.removed {
+            display: none !important;
         }
 
         .loading-logo {
@@ -111,14 +118,20 @@
             text-align: center;
         }
 
-        /* Main App Container */
-        .mtg-scanner-pro {
-            opacity: 0;
-            transition: opacity 0.5s ease-in;
+        /* 🔥 Ensure main app is always visible when loaded */
+        #root {
+            opacity: 1;
+            display: block;
+            visibility: visible;
+            z-index: 1;
+            min-height: 100vh;
         }
 
-        .mtg-scanner-pro.loaded {
-            opacity: 1;
+        /* 🔥 Force visibility class */
+        .force-visible {
+            opacity: 1 !important;
+            display: block !important;
+            visibility: visible !important;
         }
 
         /* Responsive Design */
@@ -134,17 +147,27 @@
             }
         }
 
-        /* Accessibility */
-        @media (prefers-reduced-motion: reduce) {
-            * {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-            }
+        /* 🔥 Debug styles for development */
+        .debug-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 10001;
+            display: none; /* Hidden by default */
         }
     </style>
 </head>
 <body>
+    <!-- 🔥 Debug Info -->
+    <div id="debug-info" class="debug-info">
+        Loading Screen Status: <span id="loading-status-debug">ACTIVE</span>
+    </div>
+
     <!-- Loading Screen -->
     <div id="loading-screen" class="loading-screen">
         <div class="loading-logo">
@@ -163,14 +186,23 @@
     </div>
 
     <!-- Main App Container -->
-    <div id="root"></div>
+    <div id="root" class="force-visible"></div>
 
     <!-- React and Dependencies -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 
-    <!-- Loading Management Script -->
+    <!-- 🔥 IMPROVED Loading Management Script -->
     <script>
+        console.log('🚀 MTG Scanner Pro loading script started');
+
+        // 🔥 Enable debug mode (set to false for production)
+        const DEBUG_MODE = true;
+
+        if (DEBUG_MODE) {
+            document.getElementById('debug-info').style.display = 'block';
+        }
+
         // Loading screen management
         const loadingSteps = [
             "Initializing Gemini Vision AI...",
@@ -183,6 +215,7 @@
 
         let currentStep = 0;
         const statusElement = document.getElementById('loading-status');
+        const debugStatus = document.getElementById('loading-status-debug');
 
         const updateLoadingStatus = () => {
             if (currentStep < loadingSteps.length) {
@@ -194,34 +227,89 @@
 
         updateLoadingStatus();
 
-        // 🔥 GLOBAL FUNCTION TO HIDE LOADING SCREEN
+        // 🔥 IMPROVED: Multiple hide functions with debugging
         window.hideLoadingScreen = () => {
+            console.log('🎯 hideLoadingScreen() called');
             const loadingScreen = document.getElementById('loading-screen');
-            const mainApp = document.querySelector('#root');
+            const mainApp = document.getElementById('root');
             
-            loadingScreen.classList.add('hidden');
+            if (!loadingScreen) {
+                console.log('⚠️ Loading screen element not found');
+                return;
+            }
             
+            console.log('🔄 Starting loading screen hide animation...');
+            
+            // Add multiple classes for compatibility
+            loadingScreen.classList.add('hidden', 'fade-out');
+            
+            // Update debug info
+            if (DEBUG_MODE && debugStatus) {
+                debugStatus.textContent = 'HIDING';
+            }
+            
+            // Remove after animation
             setTimeout(() => {
+                console.log('🗑️ Removing loading screen element...');
+                loadingScreen.classList.add('removed');
                 loadingScreen.style.display = 'none';
+                loadingScreen.remove(); // 🔥 Completely remove from DOM
+                
+                // Ensure main app is visible
                 if (mainApp) {
+                    mainApp.classList.add('force-visible');
                     mainApp.style.opacity = '1';
+                    mainApp.style.display = 'block';
+                    mainApp.style.visibility = 'visible';
                 }
-            }, 500);
-            
-            console.log('✅ Loading screen hidden - MTG Scanner Pro ready!');
+                
+                // Update debug info
+                if (DEBUG_MODE && debugStatus) {
+                    debugStatus.textContent = 'REMOVED';
+                }
+                
+                console.log('✅ Loading screen completely removed!');
+            }, 300); // 🔥 Faster removal
         };
+
+        // 🔥 Fallback: Auto-hide after 5 seconds
+        setTimeout(() => {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen && loadingScreen.style.display !== 'none') {
+                console.log('⏰ Auto-hiding loading screen after 5 seconds');
+                window.hideLoadingScreen();
+            }
+        }, 5000);
+
+        // 🔥 Force hide on any click (emergency escape)
+        document.addEventListener('click', () => {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen && loadingScreen.style.display !== 'none') {
+                console.log('👆 Click detected - force hiding loading screen');
+                window.hideLoadingScreen();
+            }
+        });
+
+        // 🔥 Additional escape: Pressing any key
+        document.addEventListener('keydown', () => {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen && loadingScreen.style.display !== 'none') {
+                console.log('⌨️ Key press detected - force hiding loading screen');
+                window.hideLoadingScreen();
+            }
+        });
 
         // Console welcome message
         console.log(`
-🎯 MTG SCANNER PRO - ADVANCED VERSION
-====================================
-✅ Smart Cooldown System
-✅ Gemini AI Integration  
-✅ HD Camera Support
-✅ Professional UI/UX
-✅ 98% Recognition Accuracy
+🎯 MTG SCANNER PRO - FIXED VERSION
+==================================
+✅ Improved Loading Screen Handling
+✅ Multiple Hide Mechanisms
+✅ Debug Mode Available
+✅ Force Visibility for Main App
+✅ Emergency Escape Methods
 
-🔧 Loading real Scanner component...
+🔧 Ready for Scanner component...
         `);
     </script>
 </body>

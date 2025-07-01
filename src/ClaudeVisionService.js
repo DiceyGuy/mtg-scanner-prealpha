@@ -1,4 +1,4 @@
-// ClaudeVisionService.js - FIXED RATE LIMITING LOGIC
+// ClaudeVisionService.js - OPTIMIZED FOR FEWER API CALLS
 class GeminiVisionService {
     constructor() {
         console.log('🧠 MTG CARD SCANNER - GEMINI + SCRYFALL INTEGRATION!');
@@ -6,21 +6,23 @@ class GeminiVisionService {
         this.ctx = null;
         this.debugMode = true;
         
-        // 🔥 FIXED: Better rate limiting configuration
+        // 🔥 OPTIMIZED: Reduced API call frequency
         this.geminiApiKey = 'AIzaSyBtqyUy1X3BdNtUAW88QZWbtqI39MbUDdk';
         this.geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         this.lastGeminiCall = 0;
-        this.geminiRateLimit = 5000; // 🔥 INCREASED: 5 seconds base rate limit
+        this.geminiRateLimit = 8000; // 🔥 INCREASED: 8 seconds base rate limit
         this.consecutiveErrors = 0;
-        this.consecutiveRateLimits = 0; // 🔥 NEW: Separate counter for rate limits
-        this.backoffMultiplier = 1.3; // 🔥 REDUCED: Less aggressive backoff
-        this.maxBackoff = 15000; // 🔥 NEW: Maximum 15 seconds backoff
+        this.consecutiveRateLimits = 0;
+        this.backoffMultiplier = 1.2; // 🔥 REDUCED: Even gentler backoff
+        this.maxBackoff = 12000; // 🔥 REDUCED: Maximum 12 seconds backoff
         
-        // 🔥 NEW: Frame similarity detection to reduce API calls
+        // 🔥 ENHANCED: Better frame similarity detection
         this.lastFrameHash = null;
-        this.frameSimilarityThreshold = 0.95;
+        this.frameSimilarityThreshold = 0.98; // 🔥 INCREASED: More sensitive similarity
         this.lastSuccessfulDetection = null;
         this.lastSuccessfulTime = 0;
+        this.framesSinceLastCall = 0;
+        this.minFramesBetweenCalls = 5; // 🔥 NEW: Skip frames between API calls
         
         // SCRYFALL INTEGRATION
         this.scryfallData = new Map();
@@ -102,7 +104,7 @@ class GeminiVisionService {
 
     calculateFrameHash(imageData) {
         let hash = 0;
-        const step = Math.floor(imageData.length / 100);
+        const step = Math.floor(imageData.length / 200); // 🔥 MORE DETAILED: Sample 200 points
         
         for (let i = 0; i < imageData.length; i += step) {
             hash = ((hash << 5) - hash + imageData[i]) & 0xffffffff;
@@ -111,6 +113,7 @@ class GeminiVisionService {
         return hash;
     }
 
+    // 🔥 ENHANCED: Much better frame similarity detection
     isFrameSimilarToLast(frameData) {
         const canvas = frameData.canvas;
         const ctx = canvas.getContext('2d');
@@ -122,13 +125,16 @@ class GeminiVisionService {
             return false;
         }
         
+        // 🔥 IMPROVED: Better similarity calculation
         const hashDifference = Math.abs(currentHash - this.lastFrameHash);
-        const isSimilar = hashDifference < 1000;
+        const totalPixels = imageData.data.length;
+        const similarityRatio = 1 - (hashDifference / totalPixels);
+        const isSimilar = similarityRatio > this.frameSimilarityThreshold;
         
         this.lastFrameHash = currentHash;
         
         if (isSimilar) {
-            console.log('⏭️ Frame too similar to last, skipping API call');
+            console.log(`⏭️ Frame similarity: ${(similarityRatio * 100).toFixed(1)}% - skipping API call`);
         }
         
         return isSimilar;
@@ -138,26 +144,43 @@ class GeminiVisionService {
         this.log('🔄 Processing frame for MTG CARD IDENTIFICATION...');
         const startTime = performance.now();
         
+        // 🔥 NEW: Frame counting to reduce API calls
+        this.framesSinceLastCall++;
+        if (this.framesSinceLastCall < this.minFramesBetweenCalls) {
+            return {
+                hasCard: false,
+                message: 'Skipping frame for rate limiting',
+                confidence: 0,
+                method: 'frame_skipped',
+                processingTime: Math.round(performance.now() - startTime),
+                timestamp: new Date().toISOString()
+            };
+        }
+        
         try {
             const frameData = await this.captureHighQualityFrame(videoElement);
             this.log('📷 Frame captured', `${frameData.width}x${frameData.height}`);
             
+            // 🔥 ENHANCED: Better similarity detection
             if (this.isFrameSimilarToLast(frameData)) {
                 if (this.lastSuccessfulDetection && 
-                    Date.now() - this.lastSuccessfulTime < 5000) {
+                    Date.now() - this.lastSuccessfulTime < 8000) { // 🔥 INCREASED: 8 second cache
                     this.log('♻️ Returning cached detection for similar frame');
                     return this.lastSuccessfulDetection;
                 }
                 
                 return {
                     hasCard: false,
-                    message: 'Frame unchanged, skipping scan',
+                    message: 'Frame unchanged, no new scan needed',
                     confidence: 0,
                     method: 'frame_similarity_skip',
                     processingTime: Math.round(performance.now() - startTime),
                     timestamp: new Date().toISOString()
                 };
             }
+            
+            // 🔥 Reset frame counter only when we make an API call
+            this.framesSinceLastCall = 0;
             
             const geminiResult = await this.callGeminiVisionForMTG(frameData);
             this.log('🎯 Gemini MTG analysis result', geminiResult);
@@ -171,7 +194,6 @@ class GeminiVisionService {
             if (finalResult.hasCard && finalResult.confidence >= 80) {
                 this.lastSuccessfulDetection = finalResult;
                 this.lastSuccessfulTime = Date.now();
-                // 🔥 FIXED: Only reset on actual success, not on rate limiting
                 this.consecutiveErrors = 0;
                 this.consecutiveRateLimits = 0;
             }
@@ -181,7 +203,6 @@ class GeminiVisionService {
         } catch (error) {
             this.log('❌ MTG scanning error, using fallback', error.message);
             
-            // 🔥 FIXED: Don't increment errors for rate limiting
             if (!error.message.includes('Rate limited')) {
                 this.consecutiveErrors++;
             }
@@ -191,24 +212,22 @@ class GeminiVisionService {
         }
     }
 
-    // 🔥 FIXED: Much better rate limiting logic
+    // 🔥 OPTIMIZED: Gentler rate limiting
     async callGeminiVisionForMTG(frameData) {
         this.log('🧠 Calling Gemini Vision for MTG CARD IDENTIFICATION...');
         
         const now = Date.now();
         let actualRateLimit = this.geminiRateLimit;
         
-        // 🔥 FIXED: Separate handling for consecutive rate limits vs errors
+        // 🔥 OPTIMIZED: Much gentler backoff for rate limits
         if (this.consecutiveRateLimits > 0) {
-            // Apply gentle backoff only for rate limits
             actualRateLimit = Math.min(
-                this.geminiRateLimit + (this.consecutiveRateLimits * 2000), // +2s per rate limit
-                this.maxBackoff // Cap at 15 seconds
+                this.geminiRateLimit + (this.consecutiveRateLimits * 1500), // +1.5s per rate limit
+                this.maxBackoff // Cap at 12 seconds
             );
-            console.log(`⏳ Rate limit backoff: ${actualRateLimit}ms (rate limits: ${this.consecutiveRateLimits})`);
+            console.log(`⏳ Gentle rate limit backoff: ${actualRateLimit}ms (rate limits: ${this.consecutiveRateLimits})`);
         }
         
-        // 🔥 FIXED: Apply backoff only for actual errors, not rate limits
         if (this.consecutiveErrors > 0) {
             const errorBackoff = this.geminiRateLimit * Math.pow(this.backoffMultiplier, this.consecutiveErrors);
             actualRateLimit = Math.max(actualRateLimit, Math.min(errorBackoff, this.maxBackoff));
@@ -219,7 +238,6 @@ class GeminiVisionService {
             const waitTime = actualRateLimit - (now - this.lastGeminiCall);
             this.log(`⏳ Rate limiting: waiting ${waitTime}ms`);
             
-            // 🔥 FIXED: Track rate limits separately
             this.consecutiveRateLimits++;
             
             throw new Error(`Rate limited - wait ${waitTime}ms between calls`);
@@ -295,12 +313,10 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                 this.log('❌ Gemini error response:', errorText);
                 
                 if (response.status === 429) {
-                    // 🔥 FIXED: 429 is rate limiting, not an error
                     this.consecutiveRateLimits++;
                     throw new Error(`Rate limited: ${response.status} - Gemini API rate limit exceeded`);
                 }
                 
-                // 🔥 FIXED: Other errors are actual errors
                 this.consecutiveErrors++;
                 throw new Error(`Gemini error: ${response.status} - ${errorText}`);
             }
@@ -320,7 +336,6 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
             const mtgAnalysis = this.parseMTGResponse(responseText);
             this.log('✅ MTG parsing successful:', mtgAnalysis);
             
-            // 🔥 FIXED: Reset rate limit counter on success
             if (mtgAnalysis.hasCard) {
                 this.consecutiveRateLimits = 0;
                 this.consecutiveErrors = 0;
@@ -511,7 +526,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
     async captureHighQualityFrame(videoElement) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { 
-            willReadFrequently: true // 🔥 FIXED: Eliminates Canvas2D warnings
+            willReadFrequently: true
         });
         
         canvas.width = videoElement.videoWidth;
@@ -546,7 +561,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                 colors: result.colors || [],
                 imageUri: result.imageUri || '',
                 scryfallUri: result.scryfallUri || '',
-                method: 'improved_mtg_gemini_scryfall',
+                method: 'optimized_mtg_gemini_scryfall',
                 isVerified: result.isVerified || false,
                 isFuzzyMatch: result.isFuzzyMatch || false,
                 verificationSource: result.verificationSource || 'none',
@@ -565,7 +580,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                 message: message,
                 reason: reason,
                 confidence: result.confidence || 0,
-                method: 'improved_mtg_gemini_scryfall',
+                method: 'optimized_mtg_gemini_scryfall',
                 processingTime: processingTime,
                 timestamp: new Date().toISOString(),
                 scryfallLoaded: this.scryfallLoaded
@@ -573,7 +588,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         }
     }
 
-    // 🔥 FIXED: Better fallback with error context
+    // 🔥 OPTIMIZED: Better fallback messaging
     async mtgFallback(videoElement, processingTime) {
         this.log('⚠️ MTG Vision unavailable, using fallback...');
         
@@ -581,8 +596,8 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         
         if (this.consecutiveErrors > 3) {
             fallbackMessage = 'Too many errors - please check internet connection and try again later';
-        } else if (this.consecutiveRateLimits > 5) {
-            fallbackMessage = 'Rate limited - waiting for API availability (this is normal)';
+        } else if (this.consecutiveRateLimits > 3) {
+            fallbackMessage = 'Rate limited - waiting for API availability (normal behavior, please wait)';
         } else if (this.consecutiveErrors > 1) {
             fallbackMessage = 'MTG Scanner experiencing issues - retrying with longer intervals';
         }
@@ -592,7 +607,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
             message: fallbackMessage,
             reason: this.consecutiveRateLimits > this.consecutiveErrors ? 'RATE_LIMITED' : 'SCANNER_ERROR',
             confidence: 0,
-            method: 'improved_mtg_fallback',
+            method: 'optimized_mtg_fallback',
             processingTime: processingTime,
             timestamp: new Date().toISOString(),
             scryfallLoaded: this.scryfallLoaded,
@@ -634,13 +649,13 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         return { canvas: this.canvas, ctx: this.ctx };
     }
 
-    // 🔥 NEW: Reset all error states
     resetErrorState() {
         this.consecutiveErrors = 0;
         this.consecutiveRateLimits = 0;
         this.lastFrameHash = null;
         this.lastSuccessfulDetection = null;
         this.lastSuccessfulTime = 0;
+        this.framesSinceLastCall = 0;
         console.log('🔄 Vision service error state reset');
     }
 }

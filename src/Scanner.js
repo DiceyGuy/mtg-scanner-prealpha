@@ -1,4 +1,4 @@
-// Scanner.js - MTG Scanner Pro - COMPLETE WORKING VERSION
+// Scanner.js - MTG Scanner Pro - COMPLETE VERSION WITH CAMERA SELECTOR
 import React, { useState, useRef, useEffect } from 'react';
 import ClaudeVisionService from './ClaudeVisionService';
 import './CardDisplay.css';
@@ -132,6 +132,306 @@ const ProfessionalCameraStatus = ({ cameraStatus, cameraInitialized, cameraDetai
             )}
         </div>
     );
+};
+
+// 🔧 NEW: CAMERA SELECTOR COMPONENT
+const CameraSelector = ({ availableCameras, selectedCameraId, onCameraChange, onRefresh, onDiagnose }) => {
+    const [showSelector, setShowSelector] = useState(false);
+
+    return (
+        <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                <button
+                    onClick={() => setShowSelector(!showSelector)}
+                    style={{
+                        padding: '8px 16px',
+                        background: 'rgba(74, 144, 226, 0.2)',
+                        border: '1px solid #4a90e2',
+                        color: '#4a90e2',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                    }}
+                >
+                    📷 Select Camera ({availableCameras.length} found)
+                </button>
+                
+                <button
+                    onClick={onRefresh}
+                    style={{
+                        padding: '8px 16px',
+                        background: 'rgba(34, 197, 94, 0.2)',
+                        border: '1px solid #22c55e',
+                        color: '#22c55e',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                    }}
+                >
+                    🔄 Refresh
+                </button>
+
+                <button
+                    onClick={onDiagnose}
+                    style={{
+                        padding: '8px 16px',
+                        background: 'rgba(255, 193, 7, 0.2)',
+                        border: '1px solid #ffc107',
+                        color: '#ffc107',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                    }}
+                >
+                    🔍 Diagnose
+                </button>
+            </div>
+
+            {showSelector && (
+                <div style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                    <h4 style={{ color: '#4a90e2', marginBottom: '12px', fontSize: '16px' }}>
+                        📷 Available Cameras:
+                    </h4>
+                    
+                    {availableCameras.length === 0 ? (
+                        <div style={{ 
+                            color: '#dc3545', 
+                            textAlign: 'center', 
+                            padding: '20px',
+                            background: 'rgba(220, 53, 69, 0.1)',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(220, 53, 69, 0.3)'
+                        }}>
+                            <div style={{ fontSize: '32px', marginBottom: '8px' }}>📷</div>
+                            <div style={{ fontWeight: '600', marginBottom: '4px' }}>No cameras detected</div>
+                            <small>Try refreshing, connecting a physical camera, or running diagnostics</small>
+                        </div>
+                    ) : (
+                        availableCameras.map((camera, index) => {
+                            const isElgato = camera.label.toLowerCase().includes('elgato');
+                            const isLogitech = camera.label.toLowerCase().includes('logitech');
+                            const isBuiltIn = camera.label.toLowerCase().includes('built-in') || 
+                                            camera.label.toLowerCase().includes('integrated');
+                            const isSelected = selectedCameraId === camera.deviceId;
+
+                            return (
+                                <div
+                                    key={camera.deviceId}
+                                    onClick={() => {
+                                        onCameraChange(camera.deviceId);
+                                        setShowSelector(false);
+                                    }}
+                                    style={{
+                                        padding: '12px',
+                                        margin: '8px 0',
+                                        background: isSelected ? 
+                                            'rgba(74, 144, 226, 0.3)' : 'rgba(255,255,255,0.05)',
+                                        border: isSelected ? 
+                                            '2px solid #4a90e2' : '1px solid #666',
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        transform: isSelected ? 'scale(1.02)' : 'scale(1)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!isSelected) {
+                                            e.target.style.background = 'rgba(255,255,255,0.1)';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isSelected) {
+                                            e.target.style.background = 'rgba(255,255,255,0.05)';
+                                        }
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ 
+                                                fontWeight: '600', 
+                                                marginBottom: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px'
+                                            }}>
+                                                <span>📷</span>
+                                                <span>{camera.label || `Camera ${index + 1}`}</span>
+                                                {isLogitech && (
+                                                    <span style={{ 
+                                                        background: '#22c55e', 
+                                                        color: 'white', 
+                                                        padding: '2px 6px', 
+                                                        borderRadius: '4px', 
+                                                        fontSize: '10px' 
+                                                    }}>
+                                                        RECOMMENDED
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>
+                                                ID: {camera.deviceId.substring(0, 20)}...
+                                            </div>
+                                            <div style={{ fontSize: '11px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                {isElgato && (
+                                                    <span style={{ color: '#fbbf24' }}>⚠️ Virtual Camera</span>
+                                                )}
+                                                {isLogitech && (
+                                                    <span style={{ color: '#22c55e' }}>🎯 USB Camera</span>
+                                                )}
+                                                {isBuiltIn && (
+                                                    <span style={{ color: '#64b5f6' }}>💻 Built-in</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {isSelected && (
+                                            <div style={{ color: '#4a90e2', fontWeight: 'bold', marginLeft: '16px' }}>
+                                                ✅ Active
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+
+                    {availableCameras.some(cam => cam.label.toLowerCase().includes('elgato')) && (
+                        <div style={{
+                            marginTop: '12px',
+                            padding: '12px',
+                            background: 'rgba(255, 193, 7, 0.1)',
+                            border: '1px solid rgba(255, 193, 7, 0.3)',
+                            borderRadius: '6px'
+                        }}>
+                            <div style={{ color: '#fbbf24', fontWeight: '600', marginBottom: '4px' }}>
+                                ⚠️ Elgato Camera Detected
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                Virtual cameras may require Elgato Camera Hub to be running for MTG card scanning.
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// 🔧 NEW: ENHANCED CAMERA ENUMERATION
+const enumerateCamerasEnhanced = async () => {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        console.log('📷 Enhanced camera enumeration:');
+        videoDevices.forEach((device, index) => {
+            const isElgato = device.label.toLowerCase().includes('elgato');
+            const isLogitech = device.label.toLowerCase().includes('logitech');
+            const isBuiltIn = device.label.toLowerCase().includes('built-in') || 
+                            device.label.toLowerCase().includes('integrated');
+            
+            console.log(`   ${index + 1}. ${device.label || `Camera ${index + 1}`}`);
+            console.log(`      ID: ${device.deviceId}`);
+            console.log(`      Type: ${isElgato ? 'Virtual (Elgato)' : isLogitech ? 'USB (Logitech)' : isBuiltIn ? 'Built-in' : 'Unknown'}`);
+        });
+        
+        return videoDevices;
+    } catch (error) {
+        console.error('❌ Failed to enumerate cameras:', error);
+        return [];
+    }
+};
+
+// 🔧 NEW: SMART CAMERA SELECTION
+const selectBestCamera = (cameras) => {
+    // Priority: Physical cameras first, then virtual
+    const physicalCameras = cameras.filter(camera => 
+        !camera.label.toLowerCase().includes('elgato') &&
+        !camera.label.toLowerCase().includes('virtual')
+    );
+    
+    const virtualCameras = cameras.filter(camera => 
+        camera.label.toLowerCase().includes('elgato') ||
+        camera.label.toLowerCase().includes('virtual')
+    );
+    
+    // Prefer Logitech C920
+    const logitechCamera = physicalCameras.find(camera => 
+        camera.label.toLowerCase().includes('logitech') || 
+        camera.label.toLowerCase().includes('c920')
+    );
+    
+    if (logitechCamera) {
+        console.log('✅ Auto-selected Logitech camera:', logitechCamera.label);
+        return logitechCamera.deviceId;
+    }
+    
+    // Prefer any physical camera
+    if (physicalCameras.length > 0) {
+        console.log('✅ Auto-selected physical camera:', physicalCameras[0].label);
+        return physicalCameras[0].deviceId;
+    }
+    
+    // Fall back to virtual cameras
+    if (virtualCameras.length > 0) {
+        console.log('⚠️ Using virtual camera (may need Camera Hub):', virtualCameras[0].label);
+        return virtualCameras[0].deviceId;
+    }
+    
+    return null;
+};
+
+// 🔧 NEW: TROUBLESHOOTING FUNCTION
+const diagnoseCameraIssues = async () => {
+    console.log('🔍 CAMERA DIAGNOSTIC STARTING...');
+    
+    try {
+        // Check camera permissions
+        const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+        console.log('📋 Camera permission:', permissionStatus.state);
+        
+        // Check available cameras
+        const cameras = await navigator.mediaDevices.enumerateDevices();
+        const videoCameras = cameras.filter(device => device.kind === 'videoinput');
+        
+        console.log('📷 Camera analysis:');
+        console.log(`   Total cameras found: ${videoCameras.length}`);
+        
+        videoCameras.forEach((camera, index) => {
+            const isElgato = camera.label.toLowerCase().includes('elgato');
+            console.log(`   ${index + 1}. ${camera.label}`);
+            console.log(`      Device ID: ${camera.deviceId}`);
+            console.log(`      Is Elgato: ${isElgato}`);
+            
+            if (isElgato) {
+                console.log('      ⚠️ Elgato detected - Camera Hub required');
+            }
+        });
+        
+        // Test camera access
+        if (videoCameras.length > 0) {
+            try {
+                const testStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { deviceId: videoCameras[0].deviceId } 
+                });
+                console.log('✅ Camera access test: SUCCESS');
+                testStream.getTracks().forEach(track => track.stop());
+            } catch (error) {
+                console.log('❌ Camera access test: FAILED -', error.message);
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Diagnostic failed:', error);
+    }
+    
+    console.log('🔍 CAMERA DIAGNOSTIC COMPLETE');
 };
 
 // 🔥 TABS COMPONENT
@@ -1304,6 +1604,10 @@ const Scanner = () => {
     const [cameraError, setCameraError] = useState(null);
     const [cameraDetails, setCameraDetails] = useState(null);
     
+    // 🔧 NEW: Camera selector state
+    const [availableCameras, setAvailableCameras] = useState([]);
+    const [selectedCameraId, setSelectedCameraId] = useState(null);
+    
     // Refs
     const videoRef = useRef(null);
     const scanIntervalRef = useRef(null);
@@ -1313,7 +1617,7 @@ const Scanner = () => {
 
     // Initialize everything
     useEffect(() => {
-        console.log('🔧 Initializing MTG Scanner Pro...');
+        console.log('🔧 Initializing MTG Scanner Pro with Camera Selector...');
         
         initializeServices();
         loadSavedData();
@@ -1372,6 +1676,7 @@ const Scanner = () => {
         }
     };
 
+    // 🔧 UPDATED: Enhanced camera system initialization
     const initializeCameraSystem = async () => {
         setCameraStatus('initializing');
         setCameraError(null);
@@ -1381,45 +1686,61 @@ const Scanner = () => {
                 throw new Error('Camera API not supported in this browser');
             }
 
-            const constraints = {
-                video: {
-                    width: { ideal: 1280, min: 640 },
-                    height: { ideal: 720, min: 480 },
-                    frameRate: { ideal: 30, min: 15 },
-                    facingMode: { ideal: 'environment' }
-                },
-                audio: false
-            };
-
-            setCameraStatus('requesting');
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            cameraStreamRef.current = stream;
+            // 🔧 ENHANCED: Use the new camera enumeration
+            const cameras = await enumerateCamerasEnhanced();
+            setAvailableCameras(cameras);
             
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                videoRef.current.onloadedmetadata = () => {
-                    videoRef.current.play().then(() => {
-                        setCameraStatus('ready');
-                        setCameraError(null);
-                        
-                        const videoTrack = stream.getVideoTracks()[0];
-                        const settings = videoTrack.getSettings();
-                        setCameraDetails({
-                            width: settings.width,
-                            height: settings.height,
-                            label: 'Camera Ready'
-                        });
-                        
-                        console.log('✅ Camera ready:', `${settings.width}x${settings.height}`);
-                        showProfessionalToast('✅ Camera ready!', 'success');
-                    }).catch(error => {
-                        handleCameraError(error);
-                    });
-                };
+            // 🔧 ENHANCED: Smart camera selection
+            const bestCameraId = selectBestCamera(cameras);
+            if (bestCameraId) {
+                setSelectedCameraId(bestCameraId);
+                await setupCameraWithId(bestCameraId);
+            } else {
+                throw new Error('No suitable camera found');
             }
             
         } catch (error) {
             handleCameraError(error);
+        }
+    };
+
+    // 🔧 NEW: Setup camera with specific ID
+    const setupCameraWithId = async (deviceId) => {
+        const constraints = {
+            video: {
+                deviceId: deviceId ? { exact: deviceId } : undefined,
+                width: { ideal: 1280, min: 640 },
+                height: { ideal: 720, min: 480 },
+                frameRate: { ideal: 30, min: 15 }
+            },
+            audio: false
+        };
+
+        setCameraStatus('requesting');
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        cameraStreamRef.current = stream;
+        
+        if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.onloadedmetadata = () => {
+                videoRef.current.play().then(() => {
+                    setCameraStatus('ready');
+                    setCameraError(null);
+                    
+                    const videoTrack = stream.getVideoTracks()[0];
+                    const settings = videoTrack.getSettings();
+                    setCameraDetails({
+                        width: settings.width,
+                        height: settings.height,
+                        label: 'Camera Ready'
+                    });
+                    
+                    console.log('✅ Camera ready:', `${settings.width}x${settings.height}`);
+                    showProfessionalToast('✅ Camera ready!', 'success');
+                }).catch(error => {
+                    handleCameraError(error);
+                });
+            };
         }
     };
 
@@ -1458,6 +1779,48 @@ const Scanner = () => {
         console.log('🔄 Manual camera retry requested');
         setCameraError(null);
         await initializeCameraSystem();
+    };
+
+    // 🔧 NEW: Camera switching handlers
+    const handleCameraSwitch = async (newCameraId) => {
+        console.log('🔄 Switching to camera:', newCameraId);
+        
+        // Stop current stream
+        if (cameraStreamRef.current) {
+            cameraStreamRef.current.getTracks().forEach(track => track.stop());
+            cameraStreamRef.current = null;
+        }
+        
+        // Set new camera
+        setSelectedCameraId(newCameraId);
+        setCameraDetails(null);
+        
+        // Setup with new camera
+        try {
+            await setupCameraWithId(newCameraId);
+            showProfessionalToast('📷 Camera switched successfully!', 'success');
+        } catch (error) {
+            handleCameraError(error);
+        }
+    };
+
+    const refreshCameraList = async () => {
+        console.log('🔄 Refreshing camera list...');
+        try {
+            const cameras = await enumerateCamerasEnhanced();
+            setAvailableCameras(cameras);
+            showProfessionalToast('📷 Camera list refreshed!', 'success');
+        } catch (error) {
+            console.error('❌ Failed to refresh cameras:', error);
+            showProfessionalToast('❌ Failed to refresh cameras', 'error');
+        }
+    };
+
+    // 🔧 NEW: Camera diagnostic handler
+    const handleCameraDiagnose = async () => {
+        console.log('🔍 Running camera diagnostics...');
+        await diagnoseCameraIssues();
+        showProfessionalToast('🔍 Camera diagnostics completed - check console for details', 'info');
     };
 
     const startScanning = () => {
@@ -1908,7 +2271,7 @@ const Scanner = () => {
                             MTG Scanner Pro
                         </h1>
                         <span style={{ fontSize: '0.9rem', color: '#b0bec5' }}>
-                            🔥 External Tool Integration • EDHREC • Moxfield • Scryfall
+                            🔥 Advanced Camera Selection • Smart Detection • External Integrations
                         </span>
                     </div>
                 </div>
@@ -1921,8 +2284,8 @@ const Scanner = () => {
                         border: '1px solid rgba(74, 144, 226, 0.3)',
                         fontSize: '0.85rem'
                     }}>
-                        <span style={{ color: '#94a3b8' }}>Accuracy: </span>
-                        <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>98%</span>
+                        <span style={{ color: '#94a3b8' }}>Cameras: </span>
+                        <span style={{ color: '#4a90e2', fontWeight: 'bold' }}>{availableCameras.length}</span>
                     </div>
                     <div style={{
                         background: 'rgba(74, 144, 226, 0.1)',
@@ -2018,6 +2381,15 @@ const Scanner = () => {
                                 )}
                             </div>
 
+                            {/* 🔧 NEW: Camera Selector */}
+                            <CameraSelector
+                                availableCameras={availableCameras}
+                                selectedCameraId={selectedCameraId}
+                                onCameraChange={handleCameraSwitch}
+                                onRefresh={refreshCameraList}
+                                onDiagnose={handleCameraDiagnose}
+                            />
+
                             {/* Scan Controls */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div>
@@ -2098,23 +2470,6 @@ const Scanner = () => {
                                             '📷 Camera Not Ready'
                                     }
                                 </button>
-
-                                {cameraStatus !== 'ready' && (
-                                    <button
-                                        onClick={retryCameraSetup}
-                                        style={{
-                                            padding: '8px 16px',
-                                            background: 'rgba(255, 193, 7, 0.2)',
-                                            border: '1px solid #ffc107',
-                                            color: '#ffc107',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            fontSize: '14px'
-                                        }}
-                                    >
-                                        🔄 Retry Camera Setup
-                                    </button>
-                                )}
 
                                 {cooldownStatus && !cooldownStatus.canScan && (
                                     <div style={{
@@ -2365,9 +2720,10 @@ const Scanner = () => {
                     )}
                 </div>
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', fontSize: '14px' }}>
+                    <span>📷 Cameras: {availableCameras.length}</span>
                     <span>📁 Collection: {savedCards.length}/{FREE_COLLECTION_LIMIT}</span>
                     <span>
-                        📷 Camera: {
+                        📷 Status: {
                             cameraStatus === 'ready' ? `Ready ✅` : 
                             cameraStatus === 'error' ? 'Error ❌' :
                             cameraStatus === 'permission-denied' ? 'Permission ❌' :
@@ -2475,7 +2831,7 @@ const Scanner = () => {
                         textAlign: 'center',
                         color: 'white'
                     }}>
-                        <h3>💎 Upgrade to Premium</h3>
+  <h3>💎 Upgrade to Premium</h3>
                         
                         <div style={{ margin: '20px 0', fontSize: '18px' }}>
                             <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
@@ -2492,9 +2848,10 @@ const Scanner = () => {
                             <h4 style={{ margin: '0 0 15px 0', color: '#4a90e2' }}>Premium Features:</h4>
                             <ul style={{ textAlign: 'left', lineHeight: '1.8', margin: 0, paddingLeft: '20px' }}>
                                 <li>🔥 <strong>Unlimited collection storage</strong></li>
-                                <li>🧠 <strong>Advanced collection analytics</strong></li>
-                                <li>📊 <strong>Enhanced EDHREC integration</strong></li>
+                                <li>🧠 <strong>Advanced AI learning</strong></li>
+                                <li>📊 <strong>Collection analytics</strong></li>
                                 <li>💰 <strong>Price tracking & alerts</strong></li>
+                                <li>🎯 <strong>Deck optimization tools</strong></li>
                                 <li>⚡ <strong>Priority customer support</strong></li>
                             </ul>
                         </div>
@@ -2512,7 +2869,7 @@ const Scanner = () => {
                                     cursor: 'pointer'
                                 }}
                             >
-                                💎 Upgrade for $19.99
+                                💎 Upgrade for $19.99/month
                             </button>
                             <button 
                                 onClick={() => setShowPaywallModal(false)}
@@ -2537,6 +2894,7 @@ const Scanner = () => {
                             color: '#ccc'
                         }}>
                             <p>💳 Secure payment via PayPal</p>
+                            <p>📧 Payment to: thediceyguy@gmail.com</p>
                             <p>🔒 Cancel anytime, no long-term commitment</p>
                         </div>
                     </div>
@@ -2572,6 +2930,9 @@ const Scanner = () => {
                             You've successfully scanned <strong>10 cards</strong> with the smart cooldown system.
                         </p>
                         <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
+                            AI learned <strong>{Object.keys(editionPreferences).length}</strong> edition preferences.
+                        </p>
+                        <p style={{ margin: '8px 0', lineHeight: '1.5' }}>
                             Total saved to collection: <strong>{savedCards.length}</strong> cards
                         </p>
                         
@@ -2604,6 +2965,22 @@ const Scanner = () => {
                                 ⏹️ Stop & Review
                             </button>
                         </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-around',
+                            marginTop: '16px',
+                            paddingTop: '16px',
+                            borderTop: '1px solid #444',
+                            fontSize: '12px',
+                            color: '#ccc',
+                            flexWrap: 'wrap',
+                            gap: '8px'
+                        }}>
+                            <span>🔥 Smart scans: {continuousCount}</span>
+                            <span>🧠 AI learned: {Object.keys(editionPreferences).length}</span>
+                            <span>📁 Collection: {savedCards.length} total</span>
+                        </div>
                     </div>
                 </div>
             )}
@@ -2611,4 +2988,4 @@ const Scanner = () => {
     );
 };
 
-export default Scanner;
+export default Scanner;                      

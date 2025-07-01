@@ -1,4 +1,4 @@
-// Scanner.js - COMPLETE INTEGRATED VERSION with Working Cooldown & Knowledge Base
+// Scanner.js - COMPLETE INTEGRATED VERSION with Working Cooldown & Knowledge Base + LOADING SCREEN FIX
 import React, { useState, useRef, useEffect } from 'react';
 import ClaudeVisionService from './ClaudeVisionService';
 import './CardDisplay.css';
@@ -957,6 +957,14 @@ const Scanner = () => {
         const cooldownUpdateInterval = setInterval(() => {
             setCooldownStatus(cooldownSystemRef.current.getCooldownStatus());
         }, 500); // More frequent updates for better debugging
+        
+        // 🔥 HIDE LOADING SCREEN WHEN SCANNER IS READY
+        setTimeout(() => {
+            if (window.hideLoadingScreen) {
+                window.hideLoadingScreen();
+                console.log('✅ Loading screen hidden - Scanner ready!');
+            }
+        }, 2000);
         
         return () => {
             console.log('🧹 Component unmounting - cleaning up...');

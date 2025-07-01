@@ -1,28 +1,20 @@
-// MTG-Focused GeminiVisionService.js - IMPROVED RATE LIMITING
-class GeminiVisionService {
+// ClaudeVisionService.js - BROWSER-COMPATIBLE VERSION
+class ClaudeVisionService {
     constructor() {
         console.log('🧠 MTG CARD SCANNER - GEMINI + SCRYFALL INTEGRATION!');
         this.canvas = null;
         this.ctx = null;
         this.debugMode = true;
         
-        // 🔥 IMPROVED GOOGLE GEMINI API CONFIGURATION
-        // 🔒 SIKKER: Bruk environment variable
-this.geminiApiKey = process.env.REACT_APP_GEMINI_API_KEY;
-
-if (!this.geminiApiKey) {
-    console.error('❌ Gemini API key not found in environment variables');
-    throw new Error('Gemini API key required for MTG Scanner to function');
-}
-
-console.log('✅ Gemini API key loaded from environment variables');
+        // 🔥 GOOGLE GEMINI API CONFIGURATION
+        this.geminiApiKey = 'AIzaSyBtqyUy1X3BdNtUAW88QZWbtqI39MbUDdk';
         this.geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         this.lastGeminiCall = 0;
-        this.geminiRateLimit = 4000; // 🔥 INCREASED from 1000ms to 4000ms (4 seconds)
+        this.geminiRateLimit = 4000; // 4 seconds between calls
         this.consecutiveErrors = 0;
         this.backoffMultiplier = 1.5;
         
-        // 🔥 NEW: Frame similarity detection to avoid duplicate API calls
+        // Frame similarity detection to avoid duplicate API calls
         this.lastFrameHash = null;
         this.frameSimilarityThreshold = 0.95;
         this.lastSuccessfulDetection = null;
@@ -113,7 +105,7 @@ console.log('✅ Gemini API key loaded from environment variables');
         }
     }
 
-    // 🔥 NEW: Calculate simple frame hash for similarity detection
+    // Calculate simple frame hash for similarity detection
     calculateFrameHash(imageData) {
         let hash = 0;
         const step = Math.floor(imageData.length / 100); // Sample 100 points
@@ -125,7 +117,7 @@ console.log('✅ Gemini API key loaded from environment variables');
         return hash;
     }
 
-    // 🔥 NEW: Check if current frame is too similar to last frame
+    // Check if current frame is too similar to last frame
     isFrameSimilarToLast(frameData) {
         const canvas = frameData.canvas;
         const ctx = canvas.getContext('2d');
@@ -160,7 +152,7 @@ console.log('✅ Gemini API key loaded from environment variables');
             const frameData = await this.captureHighQualityFrame(videoElement);
             this.log('📷 Frame captured', `${frameData.width}x${frameData.height}`);
             
-            // 🔥 NEW: Check frame similarity to avoid duplicate API calls
+            // Check frame similarity to avoid duplicate API calls
             if (this.isFrameSimilarToLast(frameData)) {
                 // Return last successful detection if we have one and it's recent
                 if (this.lastSuccessfulDetection && 
@@ -208,11 +200,11 @@ console.log('✅ Gemini API key loaded from environment variables');
         }
     }
 
-    // 🔥 IMPROVED: MTG-OPTIMIZED GEMINI VISION CALL with better rate limiting
+    // MTG-OPTIMIZED GEMINI VISION CALL with better rate limiting
     async callGeminiVisionForMTG(frameData) {
         this.log('🧠 Calling Gemini Vision for MTG CARD IDENTIFICATION...');
         
-        // 🔥 IMPROVED: Dynamic rate limiting with backoff
+        // Dynamic rate limiting with backoff
         const now = Date.now();
         let actualRateLimit = this.geminiRateLimit;
         
@@ -235,7 +227,7 @@ console.log('✅ Gemini API key loaded from environment variables');
         const base64Data = imageBase64.split(',')[1];
         this.log('📤 Image ready for MTG analysis, size:', base64Data.length);
         
-        // 🔥 IMPROVED: More specific MTG prompt
+        // More specific MTG prompt
         const mtgPrompt = `You are an expert Magic: The Gathering card identifier. Analyze this image ONLY for MTG cards.
 
 CRITICAL RULES:
@@ -273,10 +265,10 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                 ]
             }],
             generationConfig: {
-                temperature: 0.1, // 🔥 Lower temperature for more consistent results
+                temperature: 0.1, // Lower temperature for more consistent results
                 topK: 1,
                 topP: 0.8,
-                maxOutputTokens: 200 // 🔥 Limit output length
+                maxOutputTokens: 200 // Limit output length
             }
         };
 
@@ -299,7 +291,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                 const errorText = await response.text();
                 this.log('❌ Gemini error response:', errorText);
                 
-                // 🔥 Check for specific rate limit errors
+                // Check for specific rate limit errors
                 if (response.status === 429) {
                     this.consecutiveErrors++;
                     throw new Error(`Gemini rate limited: ${response.status} - Implementing longer backoff`);
@@ -315,7 +307,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                 throw new Error('Invalid Gemini response structure');
             }
             
-            // CRITICAL: LOG THE RAW RESPONSE TO DEBUG JSON PARSING
+            // LOG THE RAW RESPONSE TO DEBUG JSON PARSING
             const responseText = data.candidates[0].content.parts[0].text;
             console.log('🎯 RAW GEMINI RESPONSE (for debugging):');
             console.log('---START RESPONSE---');
@@ -334,7 +326,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         }
     }
 
-    // 🔥 IMPROVED: Parse MTG-specific response with better error handling
+    // Parse MTG-specific response with better error handling
     parseMTGResponse(responseText) {
         if (!responseText || responseText.includes('NOT_MTG_CARD')) {
             return {
@@ -374,7 +366,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
             }
         }
         
-        // 🔥 Validation: Must have card name and reasonable confidence
+        // Validation: Must have card name and reasonable confidence
         if (!result.cardName || result.cardName.length < 3) {
             return {
                 hasCard: false,
@@ -384,7 +376,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
             };
         }
         
-        // 🔥 Must have high confidence for MTG cards
+        // Must have high confidence for MTG cards
         if (result.confidence < 80) {
             return {
                 hasCard: false,
@@ -424,7 +416,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                     colors: scryfallCard.colors,
                     imageUri: scryfallCard.image_uri,
                     scryfallUri: scryfallCard.scryfall_uri,
-                    confidence: Math.min(enhanced.confidence + 10, 98), // 🔥 Smaller boost
+                    confidence: Math.min(enhanced.confidence + 10, 98), // Smaller boost
                     verificationSource: 'scryfall_exact_match',
                     isVerified: true
                 };
@@ -439,7 +431,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
                         setInfo: fuzzyMatch.card.set,
                         cardType: fuzzyMatch.card.type_line,
                         manaCost: fuzzyMatch.card.mana_cost,
-                        confidence: Math.min(enhanced.confidence + 5, 95), // 🔥 Smaller boost for fuzzy
+                        confidence: Math.min(enhanced.confidence + 5, 95), // Smaller boost for fuzzy
                         verificationSource: 'scryfall_fuzzy_match',
                         isFuzzyMatch: true,
                         matchScore: fuzzyMatch.score,
@@ -457,7 +449,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
     scryfallFuzzyMatch(cardName) {
         let bestMatch = null;
         let bestScore = 0;
-        const minScore = 0.8; // 🔥 Higher threshold for fuzzy matching
+        const minScore = 0.8; // Higher threshold for fuzzy matching
         
         // Search through Scryfall database
         for (const [key, card] of this.scryfallData) {
@@ -538,10 +530,10 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
     }
 
     frameToBase64(frameData) {
-        return frameData.canvas.toDataURL('image/jpeg', 0.8); // 🔥 Slightly lower quality for faster upload
+        return frameData.canvas.toDataURL('image/jpeg', 0.8); // Slightly lower quality for faster upload
     }
 
-    // 🔥 IMPROVED: FORMAT MTG SCANNER RESULT with stricter requirements
+    // FORMAT MTG SCANNER RESULT with stricter requirements
     formatMTGScannerResult(result, processingTime) {
         if (result.hasCard && result.confidence >= 80 && result.cardName && result.cardName.length >= 3) {
             return {
@@ -582,7 +574,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         }
     }
 
-    // 🔥 IMPROVED: MTG FALLBACK with better error messages
+    // MTG FALLBACK with better error messages
     async mtgFallback(videoElement, processingTime) {
         this.log('⚠️ MTG Vision unavailable, using fallback...');
         
@@ -642,7 +634,7 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
         return { canvas: this.canvas, ctx: this.ctx };
     }
 
-    // 🔥 NEW: Reset method for when user wants to clear errors
+    // Reset method for when user wants to clear errors
     resetErrorState() {
         this.consecutiveErrors = 0;
         this.lastFrameHash = null;
@@ -652,4 +644,4 @@ ONLY analyze clear, well-lit MTG cards. Reject anything unclear.`;
     }
 }
 
-export default GeminiVisionService;
+export default ClaudeVisionService;
